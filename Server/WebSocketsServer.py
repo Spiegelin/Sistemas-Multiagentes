@@ -200,16 +200,16 @@ async def handler(websocket, path):
 
         for robot in model.robots:
             x, y = model.grid.positions[robot]
-            data['robots'].append({'x': x, 'y': y, 'carrying_box': robot.carrying_box})
+            data['robots'].append({'x': (x*6)+3, 'y': -(y*6)+3, 'carrying_box': robot.carrying_box})
 
         for caja in model.cajas:
             if caja in model.grid.positions:
                 x, y = model.grid.positions[caja]
-                data['cajas'].append({'x': x, 'y': y})
+                data['cajas'].append({'x': (x*6)+3, 'y': -(y*6)+3})
 
         for base in model.bases:
             x, y = model.grid.positions[base]
-            data['bases'].append({'x': x, 'y': y, 'box_count': base.box_count})
+            data['bases'].append({'x': (x*6)+3, 'y': -(y*6)+3, 'box_count': base.box_count})
 
         # Enviar los datos en formato JSON
         await websocket.send(json.dumps(data))
