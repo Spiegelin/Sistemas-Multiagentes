@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib
 import matplotlib.animation as animation
 import random
+import time
 
 # En postman ws://localhost:8765
 
@@ -177,17 +178,24 @@ parameters = {
 model = WarehouseModel(parameters)
 model.setup()  # Asegurar que se llame a la configuración inicial
 
+# Registrar el tiempo de inicio
+start_time = time.time()
 
 async def handler(websocket, path):
     while True:
         # Avanzar un paso en el modelo
         model.step()
 
+        # Calcular la duración del programa
+        duration = time.time() - start_time
+
         # Preparar los datos para enviar
         data = {
             'robots': [],
             'cajas': [],
-            'bases': []
+            'bases': [],
+            'duration': duration,
+            'steps': model.t,
         }
 
         for robot in model.robots:
