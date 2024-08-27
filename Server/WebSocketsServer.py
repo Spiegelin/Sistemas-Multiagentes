@@ -40,7 +40,7 @@ with onto:
         range = [str]
 
 
-# Definición de Agentes
+
 class RobotAgent(ap.Agent):
     def setup(self):
         self.carrying_box = False  # El robot empieza sin llevar una caja
@@ -48,6 +48,7 @@ class RobotAgent(ap.Agent):
         self.direction = (0, 0)  # Dirección actual del robot
         self.target_box = None  # Caja objetivo
         self.target_base = None  # Base objetivo
+        self.caja_carrying = None  # Referencia a la caja que está llevando
 
     def step(self):
         # El robot primero busca una caja si no lleva una
@@ -91,6 +92,7 @@ class RobotAgent(ap.Agent):
     def pick_box(self, caja):
         # Recoger la caja y eliminarla del grid
         self.carrying_box = True
+        self.caja_carrying = caja  # Guardar referencia de la caja
         self.model.grid.remove_agents(caja)
         print(f"{self}: recogió una caja en {self.model.grid.positions[self]}")
 
@@ -98,6 +100,7 @@ class RobotAgent(ap.Agent):
         # Dejar la caja en la base si hay espacio
         base.box_count += 1
         self.carrying_box = False
+        self.caja_carrying = None  # Dejar de llevar la caja
         print(f"{self}: dejó una caja en la base en {self.model.grid.positions[base]}")
 
     def move_random(self):
@@ -134,7 +137,6 @@ class CajaAgent(ap.Agent):
             if self in self.model.grid.positions:
                 self.pos = self.model.grid.positions[self]
 
-
 class BaseAgent(ap.Agent):
     def setup(self):
         self.box_count = 0  # Contador de cajas en la base
@@ -163,7 +165,6 @@ class WarehouseModel(ap.Model):
         self.robots.step()
         self.cajas.step()
         self.t += 1  # Incrementar el tiempo del modelo
-
 # Parámetros del modelo
 parameters = {
     'M': 10,
@@ -201,6 +202,10 @@ async def handler(websocket, path):
         for robot in model.robots:
             x, y = model.grid.positions[robot]
             data['robots'].append({'x': (x*6)+3, 'y': -(y*6)+3, 'carrying_box': robot.carrying_box})
+
+            # Si el robot lleva una caja, enviar la posición de la caja
+            if robot.carrying_box and robot.caja_carrying is not None:
+                data['cajas'].append({'x': (x*6)+3, 'y': -(y*6)+3})  # La caja sigue la posición del robot
 
         for caja in model.cajas:
             if caja in model.grid.positions:
