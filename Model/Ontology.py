@@ -1,6 +1,6 @@
 from owlready2 import *
 
-# Cargar ontología
+# Cargar ontología (desde Vaccum Cleaner)
 onto = get_ontology("file://onto.owl")
 with onto:
     class Entity(Thing):

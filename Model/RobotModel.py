@@ -1,4 +1,3 @@
-# Importar módulos
 import agentpy as ap
 from matplotlib import pyplot as plt
 import numpy as np
@@ -9,7 +8,7 @@ import time
 from Agents import RobotAgent, CajaAgent, BaseAgent
 
 # Cambiar el backend de Matplotlib
-matplotlib.use('TkAgg')  # O 'Qt5Agg', dependiendo de tu entorno
+matplotlib.use('TkAgg') 
 
 # Definición del Ambiente
 class WarehouseModel(ap.Model):
@@ -24,12 +23,12 @@ class WarehouseModel(ap.Model):
         self.grid.add_agents(self.cajas, random=True, empty=True)
         self.grid.add_agents(self.bases, random=True, empty=True)
 
-        self.start_time = time.time()  # Registrar el tiempo de inicio
+        self.start_time = time.time()  # Tiempo de inicio del modelo
 
     def step(self):
         self.robots.step()
         self.cajas.step()
-        self.t += 1  # Incrementar el tiempo del modelo
+        self.t += 1  # Incrementar el tiempo del modelo por cada paso
 
     def all_bases_full(self):
         """Verifica si todas las bases tienen 5 cajas."""
@@ -73,29 +72,27 @@ def simple_animation_plot(model, ax):
     for caja in model.cajas:
         if caja in model.grid.positions:
             x, y = model.grid.positions[caja]
-            grid_matrix[x, y] = 1  # Las cajas tienen valor 1
+            grid_matrix[x, y] = 1  
     
     for base in model.bases:
         x, y = model.grid.positions[base]
-        grid_matrix[x, y] = 2  # Las bases tienen valor 2
+        grid_matrix[x, y] = 2 
 
-    # Crear un mapa de colores personalizado
+    # Mapa de colores (versión Saydrak)
     cmap = matplotlib.colors.ListedColormap(['blue', 'lightblue', 'red', 'green'])
     bounds = [0, 0.5, 1, 2, 3]
     norm = matplotlib.colors.BoundaryNorm(bounds, cmap.N)
 
-    # Mostrar la cuadrícula sin usar vmin/vmax, ya que norm maneja los límites
     img = ax.imshow(grid_matrix, cmap=cmap, norm=norm)
     
-    # Leyenda personalizada
+    # Leyenda
     labels = ['Robot sin caja', 'Robot con caja', 'Caja', 'Base']
     colors = ['blue', 'lightblue', 'red', 'green']
     patches = [matplotlib.patches.Patch(color=colors[i], label=labels[i]) for i in range(len(labels))]
 
-    # Añadir la leyenda al gráfico
     ax.legend(handles=patches, loc='upper left', bbox_to_anchor=(1, 1))
     
-    # Calcular el tiempo transcurrido
+    # Tiempo transcurrido
     elapsed_time = time.time() - model.start_time
     ax.set_title(f"Step: {model.t}, Time: {elapsed_time:.2f}s")
     plt.draw()
@@ -112,7 +109,7 @@ parameters = {
 
 # Crear modelo
 model = WarehouseModel(parameters)
-model.setup()  # Asegurar que se llame a la configuración inicial
+model.setup() 
 
 # Crear y mostrar la animación
 fig, ax = plt.subplots()
@@ -136,6 +133,5 @@ def update(frame):
         plt.close(fig)  
 
 
-# Intervalo de 300 milisegundos para una animación más fluida
 ani = animation.FuncAnimation(fig, update, frames=range(parameters['steps']), interval=300, repeat=False)
-plt.show()  # Muestra la animación
+plt.show()

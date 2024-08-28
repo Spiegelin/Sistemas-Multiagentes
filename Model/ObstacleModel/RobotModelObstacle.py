@@ -1,4 +1,3 @@
-# Importar módulos
 import agentpy as ap
 from matplotlib import pyplot as plt
 import numpy as np
@@ -10,7 +9,7 @@ import random
 from AgentsObstacle import RobotAgent, CajaAgent, BaseAgent
 
 # Cambiar el backend de Matplotlib
-matplotlib.use('TkAgg')  # O 'Qt5Agg', dependiendo de tu entorno
+matplotlib.use('TkAgg') 
 
 # Definición del Ambiente
 class WarehouseModel(ap.Model):
@@ -21,12 +20,12 @@ class WarehouseModel(ap.Model):
 
         self.grid = ap.Grid(self, (self.p.M, self.p.N), track_empty=True)
 
-        # Definir obstáculos para crear pasillos verticales tipo supermercado
+        # Definir obstáculos para crear pasillos verticales
         self.obstacles = set()
         for x in range(self.p.M):
             for y in range(self.p.N):
                 # Crear obstáculos excepto en las columnas que corresponden a los pasillos y las esquinas
-                if y not in [2, 4, 6, 8] or x in [0, self.p.M-1]:  # Esquinas abiertas
+                if y not in [2, 4, 6, 8] or x in [0, self.p.M-1]: 
                     continue
                 self.obstacles.add((x, y))
 
@@ -96,33 +95,31 @@ def simple_animation_plot(model, ax):
     for caja in model.cajas:
         if caja in model.grid.positions:
             x, y = model.grid.positions[caja]
-            grid_matrix[x, y] = 1  # Las cajas tienen valor 1
+            grid_matrix[x, y] = 1 
     
     for base in model.bases:
         x, y = model.grid.positions[base]
-        grid_matrix[x, y] = 2  # Las bases tienen valor 2
+        grid_matrix[x, y] = 2 
 
     # Añadir los obstáculos a la matriz
     for (x, y) in model.obstacles:
-        grid_matrix[x, y] = 3  # Obstáculos tienen valor 3
+        grid_matrix[x, y] = 3 
 
-    # Crear un mapa de colores personalizado
+    # Mapa de colores
     cmap = matplotlib.colors.ListedColormap(['blue', 'lightblue', 'red', 'green', 'black'])
     bounds = [0, 0.5, 1, 2, 3, 4]
     norm = matplotlib.colors.BoundaryNorm(bounds, cmap.N)
 
-    # Mostrar la cuadrícula sin usar vmin/vmax, ya que norm maneja los límites
     img = ax.imshow(grid_matrix, cmap=cmap, norm=norm)
     
-    # Leyenda personalizada
+    # Leyenda
     labels = ['Robot sin caja', 'Robot con caja', 'Caja', 'Base', 'Obstáculo']
     colors = ['blue', 'lightblue', 'red', 'green', 'black']
     patches = [matplotlib.patches.Patch(color=colors[i], label=labels[i]) for i in range(len(labels))]
 
-    # Añadir la leyenda al gráfico
     ax.legend(handles=patches, loc='upper left', bbox_to_anchor=(1, 1))
     
-    # Calcular el tiempo transcurrido
+    # Tiempo transcurrido
     elapsed_time = time.time() - model.start_time
     ax.set_title(f"Step: {model.t}, Time: {elapsed_time:.2f}s")
     plt.draw()
@@ -140,9 +137,8 @@ parameters = {
 
 # Crear modelo
 model = WarehouseModel(parameters)
-model.setup()  # Asegurar que se llame a la configuración inicial
+model.setup() 
 
-# Crear y mostrar la animación
 fig, ax = plt.subplots()
 
 def update(frame):
@@ -165,6 +161,5 @@ def update(frame):
         print(f"Pasos totales: {model.t-1}")
         plt.close(fig)  # Cerrar la figura para terminar la animación
 
-# Intervalo de 300 milisegundos para una animación más fluida
 ani = animation.FuncAnimation(fig, update, frames=range(parameters['steps']), interval=300, repeat=False)
-plt.show()  # Muestra la animación
+plt.show() 

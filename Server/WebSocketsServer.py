@@ -12,7 +12,7 @@ import time
 from owlready2 import *
 
 # Cambiar el backend de Matplotlib
-matplotlib.use('TkAgg')  # O 'Qt5Agg', dependiendo de tu entorno
+matplotlib.use('TkAgg')
 
 onto = get_ontology("file://onto.owl")
 with onto:
@@ -200,7 +200,7 @@ async def handler(websocket, path):
             'bases': [],
             'duration': duration,
             'steps': model.t,
-            'complete': False  # Por defecto, no está completo
+            'complete': False 
         }
 
         for robot in model.robots:
@@ -240,7 +240,7 @@ async def handler(websocket, path):
         if todas_bases_completas(model):
             data['complete'] = True
             print("Todas las bases están completas. Enviando mensaje final.")
-            # Enviar mensaje final con tiempo total, pasos totales y estado de completado
+
             final_data = {
                 'type': 'final',
                 'duration': time.time() - start_time,
@@ -253,7 +253,7 @@ async def handler(websocket, path):
         # Verificar si se han agotado los pasos
         if steps >= parameters['steps']:
             print("Se han agotado todos los pasos. No todas las bases están llenas de cajas.")
-            # Enviar mensaje final con tiempo total, pasos totales y estado de completado
+            
             final_data = {
                 'type': 'final',
                 'duration': time.time() - start_time,
