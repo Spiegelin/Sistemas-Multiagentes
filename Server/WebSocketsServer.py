@@ -5,11 +5,8 @@ import agentpy as ap
 from matplotlib import pyplot as plt
 import numpy as np
 import matplotlib
-import matplotlib.animation as animation
 import random
 import time
-
-# En postman ws://localhost:8765
 
 # Ontología
 from owlready2 import *
@@ -39,50 +36,40 @@ with onto:
         domain = [Entity]
         range = [str]
 
-
-
 class RobotAgent(ap.Agent):
     def setup(self):
-        self.carrying_box = False  # El robot empieza sin llevar una caja
-        self.owl_entity = Robot()  # Conectar con la ontología
-        self.direction = (0, 0)  # Dirección actual del robot
-        self.target_box = None  # Caja objetivo
-        self.target_base = None  # Base objetivo
-        self.caja_carrying = None  # Referencia a la caja que está llevando
+        self.carrying_box = False
+        self.owl_entity = Robot()
+        self.direction = (0, 0)
+        self.target_box = None
+        self.target_base = None
+        self.caja_carrying = None
 
     def step(self):
-        # El robot primero busca una caja si no lleva una
         if not self.carrying_box:
             self.buscar_caja()
         else:
             self.buscar_base()
 
     def buscar_caja(self):
-        # Revisa los 4 lados (N, S, E, O) para encontrar una caja
         posiciones_vecinas = self.model.grid.neighbors(self, distance=1)
         for vecino in posiciones_vecinas:
             if isinstance(vecino, CajaAgent):
-                # Si encuentra una caja, se mueve hacia ella
                 self.move_towards(vecino)
                 self.pick_box(vecino)
                 return
-        # Si no encuentra una caja, se mueve aleatoriamente
         self.move_random()
 
     def buscar_base(self):
-        # Revisa los 4 lados (N, S, E, O) para encontrar una base
         posiciones_vecinas = self.model.grid.neighbors(self, distance=1)
         for vecino in posiciones_vecinas:
             if isinstance(vecino, BaseAgent) and vecino.box_count < 5:
-                # Si encuentra una base disponible, se mueve hacia ella
                 self.move_towards(vecino)
                 self.drop_box(vecino)
                 return
-        # Si no encuentra una base, se mueve aleatoriamente
         self.move_random()
 
     def move_towards(self, target):
-        # Mueve el robot hacia un objetivo (caja o base)
         target_pos = self.model.grid.positions[target]
         self_pos = self.model.grid.positions[self]
         movement = (target_pos[0] - self_pos[0], target_pos[1] - self_pos[1])
@@ -90,41 +77,38 @@ class RobotAgent(ap.Agent):
         self.forward()
 
     def pick_box(self, caja):
-        # Recoger la caja y eliminarla del grid
         self.carrying_box = True
-        self.caja_carrying = caja  # Guardar referencia de la caja
+        self.caja_carrying = caja
         self.model.grid.remove_agents(caja)
         print(f"{self}: recogió una caja en {self.model.grid.positions[self]}")
 
     def drop_box(self, base):
-        # Dejar la caja en la base si hay espacio
         base.box_count += 1
         self.carrying_box = False
-        self.caja_carrying = None  # Dejar de llevar la caja
+        self.caja_carrying.pos = self.model.grid.positions[self]
+        self.caja_carrying = None
         print(f"{self}: dejó una caja en la base en {self.model.grid.positions[base]}")
 
     def move_random(self):
-        # Movimiento aleatorio si no hay cajas ni bases cercanas
         self.direction = random.choice([(-1, 0), (1, 0), (0, -1), (0, 1)])
         self.forward()
 
     def forward(self):
-        # Mueve el robot en la dirección especificada, revisando colisiones
-        if not self.check_collision():
+        next_pos = tuple(np.add(self.model.grid.positions[self], self.direction))
+        if not self.check_collision(next_pos) and next_pos not in self.model.obstacles:
             self.model.grid.move_by(self, self.direction)
 
-    def check_collision(self):
-        # Verificar colisiones con otros robots
+    def check_collision(self, next_pos):
         vecinos = self.model.grid.neighbors(self, distance=1)
         for robot in vecinos:
             if isinstance(robot, RobotAgent):
-                if self.model.grid.positions[robot] == self.model.grid.positions[self]:
+                if self.model.grid.positions[robot] == next_pos:
                     if self.carrying_box and not robot.carrying_box:
-                        return False  # El robot con caja tiene prioridad
+                        return False
                     elif not self.carrying_box and robot.carrying_box:
-                        return True  # El otro robot tiene prioridad
+                        return True
                     else:
-                        return random.choice([True, False])  # Resolución aleatoria
+                        return random.choice([True, False])
         return False
 
 class CajaAgent(ap.Agent):
@@ -132,16 +116,15 @@ class CajaAgent(ap.Agent):
         self.pos = None
 
     def step(self):
-        # Asegurarnos de que la caja esté en la cuadrícula antes de intentar acceder a su posición
         if self.pos is None:
             if self in self.model.grid.positions:
                 self.pos = self.model.grid.positions[self]
 
 class BaseAgent(ap.Agent):
     def setup(self):
-        self.box_count = 0  # Contador de cajas en la base
-        self.pos = None  # Posición inicial de la base
-        self.owl_entity = Base()  # Conectar con la ontología
+        self.box_count = 0
+        self.pos = None
+        self.owl_entity = Base()
 
     def step(self):
         if self.pos is None:
@@ -157,14 +140,27 @@ class WarehouseModel(ap.Model):
 
         self.grid = ap.Grid(self, (self.p.M, self.p.N), track_empty=True)
 
-        self.grid.add_agents(self.robots, random=True, empty=True)
-        self.grid.add_agents(self.cajas, random=True, empty=True)
-        self.grid.add_agents(self.bases, random=True, empty=True)
+        # Definir obstáculos para crear pasillos verticales tipo supermercado
+        self.obstacles = set()
+        for x in range(self.p.M):
+            for y in range(self.p.N):
+                # Crear obstáculos excepto en las columnas que corresponden a los pasillos y las esquinas
+                if y not in [2, 4, 6, 8] or x in [0, self.p.M-1]:  # Esquinas abiertas
+                    continue
+                self.obstacles.add((x, y))
+
+        # No agregar agentes en posiciones de obstáculos
+        empty_positions = list(set(self.grid.empty).difference(self.obstacles))
+
+        self.grid.add_agents(self.robots, positions=random.sample(empty_positions, len(self.robots)))
+        self.grid.add_agents(self.cajas, positions=random.sample(empty_positions, len(self.cajas)))
+        self.grid.add_agents(self.bases, positions=random.sample(empty_positions, len(self.bases)))
 
     def step(self):
         self.robots.step()
         self.cajas.step()
-        self.t += 1  # Incrementar el tiempo del modelo
+        self.t += 1
+
 # Parámetros del modelo
 parameters = {
     'M': 10,
@@ -177,20 +173,17 @@ parameters = {
 
 # Crear modelo
 model = WarehouseModel(parameters)
-model.setup()  # Asegurar que se llame a la configuración inicial
+model.setup()
 
 # Registrar el tiempo de inicio
 start_time = time.time()
 
 async def handler(websocket, path):
     while True:
-        # Avanzar un paso en el modelo
         model.step()
 
-        # Calcular la duración del programa
         duration = time.time() - start_time
 
-        # Preparar los datos para enviar
         data = {
             'robots': [],
             'cajas': [],
@@ -201,25 +194,39 @@ async def handler(websocket, path):
 
         for robot in model.robots:
             x, y = model.grid.positions[robot]
-            data['robots'].append({'x': (x*6)+3, 'y': -(y*6)+3, 'carrying_box': robot.carrying_box})
+            robot_data = {
+                'id': robot.id,
+                'x': (x * 6) + 3,
+                'y': -(y * 6) + 3,
+                'carrying_box': robot.carrying_box
+            }
 
-            # Si el robot lleva una caja, enviar la posición de la caja
             if robot.carrying_box and robot.caja_carrying is not None:
-                data['cajas'].append({'x': (x*6)+3, 'y': -(y*6)+3})  # La caja sigue la posición del robot
+                robot_data['box_id'] = robot.caja_carrying.id
+
+                data['cajas'].append({
+                    'id': robot.caja_carrying.id,
+                    'x': (x * 6) + 3,
+                    'y': -(y * 6) + 3
+                })
+
+            data['robots'].append(robot_data)
 
         for caja in model.cajas:
-            if caja in model.grid.positions:
+            if caja in model.grid.positions and caja not in [robot.caja_carrying for robot in model.robots]:
                 x, y = model.grid.positions[caja]
-                data['cajas'].append({'x': (x*6)+3, 'y': -(y*6)+3})
+                data['cajas'].append({'id': caja.id, 'x': (x * 6) + 3, 'y': -(y * 6) + 3})
+                
+            elif caja not in model.grid.positions and caja.pos is not None:
+                x, y = caja.pos
+                data['cajas'].append({'x': (x*6) + 3, 'y': -(y * 6) + 3})
 
         for base in model.bases:
             x, y = model.grid.positions[base]
-            data['bases'].append({'x': (x*6)+3, 'y': -(y*6)+3, 'box_count': base.box_count})
+            data['bases'].append({'id': base.id, 'x': (x * 6) + 3, 'y': -(y * 6) + 3, 'box_count': base.box_count})
 
-        # Enviar los datos en formato JSON
         await websocket.send(json.dumps(data))
 
-        # Esperar un poco antes del siguiente envío
         await asyncio.sleep(1)
 
 start_server = websockets.serve(handler, 'localhost', 8765)
