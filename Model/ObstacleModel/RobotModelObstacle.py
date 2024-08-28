@@ -6,7 +6,8 @@ import matplotlib
 import matplotlib.animation as animation
 import matplotlib.patches as patches
 import time
-from Agents import RobotAgent, CajaAgent, BaseAgent
+import random
+from AgentsObstacle import RobotAgent, CajaAgent, BaseAgent
 
 # Cambiar el backend de Matplotlib
 matplotlib.use('TkAgg')  # O 'Qt5Agg', dependiendo de tu entorno
@@ -20,11 +21,24 @@ class WarehouseModel(ap.Model):
 
         self.grid = ap.Grid(self, (self.p.M, self.p.N), track_empty=True)
 
-        self.grid.add_agents(self.robots, random=True, empty=True)
-        self.grid.add_agents(self.cajas, random=True, empty=True)
-        self.grid.add_agents(self.bases, random=True, empty=True)
+        # Definir obstáculos para crear pasillos verticales tipo supermercado
+        self.obstacles = set()
+        for x in range(self.p.M):
+            for y in range(self.p.N):
+                # Crear obstáculos excepto en las columnas que corresponden a los pasillos y las esquinas
+                if y not in [2, 4, 6, 8] or x in [0, self.p.M-1]:  # Esquinas abiertas
+                    continue
+                self.obstacles.add((x, y))
 
-        self.start_time = time.time()  # Registrar el tiempo de inicio
+
+        # No agregar agentes en posiciones de obstáculos
+        empty_positions = list(set(self.grid.empty).difference(self.obstacles))
+
+        self.grid.add_agents(self.robots, positions=random.sample(empty_positions, len(self.robots)))
+        self.grid.add_agents(self.cajas, positions=random.sample(empty_positions, len(self.cajas)))
+        self.grid.add_agents(self.bases, positions=random.sample(empty_positions, len(self.bases)))
+
+        self.start_time = time.time()  #
 
     def step(self):
         self.robots.step()
@@ -40,23 +54,32 @@ def print_grid(model):
     """Imprimir la cuadrícula como una matriz 2D en la terminal."""
     grid_matrix = np.full((model.p.M, model.p.N), '.', dtype=str)
     
+    # Establecer los robots
     for robot in model.robots:
         x, y = model.grid.positions[robot]
         grid_matrix[x, y] = 'R' if not robot.carrying_box else 'r'
     
+    # Establecer las cajas
     for caja in model.cajas:
         if caja in model.grid.positions:
             x, y = model.grid.positions[caja]
             grid_matrix[x, y] = 'C'
     
+    # Establecer las bases
     for base in model.bases:
         x, y = model.grid.positions[base]
         grid_matrix[x, y] = str(base.box_count)
     
+    # Establecer los obstáculos
+    for (x, y) in model.obstacles:
+        grid_matrix[x, y] = 'X'
+    
+    # Imprimir el estado actual de la cuadrícula
     print(f"Step: {model.t}")
     for row in grid_matrix:
         print(' '.join(row))
     print()
+
 
 def simple_animation_plot(model, ax):
     """Gráfico simple para verificar la animación con leyenda"""
@@ -65,7 +88,7 @@ def simple_animation_plot(model, ax):
     # Crear una matriz para el gráfico
     grid_matrix = np.full((model.p.M, model.p.N), np.nan)  
     
-    # Colocar los robots, cajas y bases en la matriz
+    # Colocar los robots, cajas, bases y obstáculos en la matriz
     for robot in model.robots:
         x, y = model.grid.positions[robot]
         grid_matrix[x, y] = 0 if not robot.carrying_box else 0.5  # Robots sin caja (0) y con caja (0.5)
@@ -79,17 +102,21 @@ def simple_animation_plot(model, ax):
         x, y = model.grid.positions[base]
         grid_matrix[x, y] = 2  # Las bases tienen valor 2
 
+    # Añadir los obstáculos a la matriz
+    for (x, y) in model.obstacles:
+        grid_matrix[x, y] = 3  # Obstáculos tienen valor 3
+
     # Crear un mapa de colores personalizado
-    cmap = matplotlib.colors.ListedColormap(['blue', 'lightblue', 'red', 'green'])
-    bounds = [0, 0.5, 1, 2, 3]
+    cmap = matplotlib.colors.ListedColormap(['blue', 'lightblue', 'red', 'green', 'black'])
+    bounds = [0, 0.5, 1, 2, 3, 4]
     norm = matplotlib.colors.BoundaryNorm(bounds, cmap.N)
 
     # Mostrar la cuadrícula sin usar vmin/vmax, ya que norm maneja los límites
     img = ax.imshow(grid_matrix, cmap=cmap, norm=norm)
     
     # Leyenda personalizada
-    labels = ['Robot sin caja', 'Robot con caja', 'Caja', 'Base']
-    colors = ['blue', 'lightblue', 'red', 'green']
+    labels = ['Robot sin caja', 'Robot con caja', 'Caja', 'Base', 'Obstáculo']
+    colors = ['blue', 'lightblue', 'red', 'green', 'black']
     patches = [matplotlib.patches.Patch(color=colors[i], label=labels[i]) for i in range(len(labels))]
 
     # Añadir la leyenda al gráfico
@@ -99,6 +126,7 @@ def simple_animation_plot(model, ax):
     elapsed_time = time.time() - model.start_time
     ax.set_title(f"Step: {model.t}, Time: {elapsed_time:.2f}s")
     plt.draw()
+
 
 # Parámetros del modelo
 parameters = {
@@ -122,19 +150,20 @@ def update(frame):
     simple_animation_plot(model, ax)
     print_grid(model)  # Imprimir la cuadrícula en la terminal
 
+    # Verificar si todas las bases están llenas de cajas
     if model.all_bases_full():
         print("Todas las bases tienen 5 cajas. El programa ha terminado.")
         print(f"Tiempo total: {time.time() - model.start_time:.2f} segundos")
         print(f"Pasos totales: {model.t-1}")
         plt.close(fig)  # Cerrar la figura para terminar la animación
+        return
 
     # Verificar si se han agotado los pasos
     if frame == parameters['steps'] - 1:
         print("Se han agotado todos los pasos. No todas las bases están llenas de cajas.")
         print(f"Tiempo total: {time.time() - model.start_time:.2f} segundos")
         print(f"Pasos totales: {model.t-1}")
-        plt.close(fig)  
-
+        plt.close(fig)  # Cerrar la figura para terminar la animación
 
 # Intervalo de 300 milisegundos para una animación más fluida
 ani = animation.FuncAnimation(fig, update, frames=range(parameters['steps']), interval=300, repeat=False)

@@ -168,7 +168,7 @@ parameters = {
     'robots': 5,
     'cajas': 10,
     'bases': 2,
-    'steps': 100,
+    'steps': 500,
 }
 
 # Crear modelo
@@ -178,9 +178,19 @@ model.setup()
 # Registrar el tiempo de inicio
 start_time = time.time()
 
+def todas_bases_completas(modelo):
+    """ Verifica si todas las bases han alcanzado su capacidad máxima. """
+    for base in modelo.bases:
+        if base.box_count < 5:  # Suponiendo que la capacidad máxima es 5
+            return False
+    return True
+
+
 async def handler(websocket, path):
+    steps = 0
     while True:
         model.step()
+        steps += 1
 
         duration = time.time() - start_time
 
@@ -190,6 +200,7 @@ async def handler(websocket, path):
             'bases': [],
             'duration': duration,
             'steps': model.t,
+            'complete': False  # Por defecto, no está completo
         }
 
         for robot in model.robots:
@@ -225,9 +236,38 @@ async def handler(websocket, path):
             x, y = model.grid.positions[base]
             data['bases'].append({'id': base.id, 'x': (x * 6) + 3, 'y': -(y * 6) + 3, 'box_count': base.box_count})
 
-        await websocket.send(json.dumps(data))
+        # Verificar si todas las bases están completas
+        if todas_bases_completas(model):
+            data['complete'] = True
+            print("Todas las bases están completas. Enviando mensaje final.")
+            # Enviar mensaje final con tiempo total, pasos totales y estado de completado
+            final_data = {
+                'type': 'final',
+                'duration': time.time() - start_time,
+                'steps': model.t,
+                'complete': True
+            }
+            await websocket.send(json.dumps(final_data))
+            break
 
+        # Verificar si se han agotado los pasos
+        if steps >= parameters['steps']:
+            print("Se han agotado todos los pasos. No todas las bases están llenas de cajas.")
+            # Enviar mensaje final con tiempo total, pasos totales y estado de completado
+            final_data = {
+                'type': 'final',
+                'duration': time.time() - start_time,
+                'steps': model.t,
+                'complete': False
+            }
+            await websocket.send(json.dumps(final_data))
+            break
+
+        await websocket.send(json.dumps(data))
         await asyncio.sleep(1)
+    
+    # Cerrar la conexión del WebSocket
+    await websocket.close()
 
 start_server = websockets.serve(handler, 'localhost', 8765)
 
