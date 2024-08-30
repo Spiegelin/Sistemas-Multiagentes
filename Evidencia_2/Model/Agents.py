@@ -100,6 +100,8 @@ class GuardAgent(ap.Agent):
 
     def take_control(self, drone, certainty, danger):
         print(f"* Guardia toma control del dron con certeza {certainty} y peligro {danger}")
+        #result = ComputationalVision.detect_danger() # Detectar peligro por visión computacional
+        # danger = True if result['danger'] == true else False
         if certainty > 0.7 and danger:
             self.trigger_alarm()
         else:

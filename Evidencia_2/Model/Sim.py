@@ -1,6 +1,6 @@
 from Ontology import Drone, Camera, Guard
 
-# Simulación de seguridad con agentes
+# Simulación del funcionamiento del modelo
 import agentpy as ap
 import random
 import matplotlib.pyplot as plt
@@ -69,13 +69,15 @@ class DroneAgent(ap.Agent):
 class CameraAgent(ap.Agent):
     def setup(self):
         self.owl_entity = Camera()
+        #self.id = self.id
 
     def detect_movement(self):
         # Simular detección de movimiento
         if random.random() > 0.7:  # Simulación aleatoria de movimiento detectado
             certainty = random.uniform(0.5, 0.9)
             position = random.choice(self.model.route)
-            print(f"- Cámara detecta movimiento en {position} con certeza {certainty}")
+            #position = UnityFunctions.get_camera_position(self.id)
+            print(f"- Cámara {self} detecta movimiento en {position} con certeza {certainty}")
             self.model.drone.receive_alert(certainty, position)
 
 class GuardAgent(ap.Agent):
@@ -84,6 +86,7 @@ class GuardAgent(ap.Agent):
 
     def take_control(self, drone, certainty, danger):
         print(f"* Guardia toma control del dron con certeza {certainty} y peligro {danger}")
+        danger = True if random.random() > 0.5 else False  # Simulación aleatoria de peligro
         if certainty > 0.7 and danger:
             self.trigger_alarm()
         else:
@@ -91,6 +94,7 @@ class GuardAgent(ap.Agent):
 
     def trigger_alarm(self):
         print("* ¡Alarma general! Peligro detectado.")
+        time.sleep(5)
 
     def false_alarm(self, drone):
         print("* Falsa alarma. El dron vuelve a su ruta.")
@@ -145,12 +149,15 @@ def update(frame):
     route_path.set_data(*zip(*route_positions))
 
     # Actualizar posiciones de las cámaras
-    cam_positions = [(1, 1), (2, 2), (3, 3)]
+    cam_positions = [(1, 1), (0.5, 0.5), (1.5, 1), (0.5, 1.5)]
     cx, cy = zip(*cam_positions)
     camera_pos.set_data(cx, cy)
 
     # Posición del guardia (no se mueve en este ejemplo)
     guard_pos.set_data([0], [0])
+
+    # Steps
+    ax.set_title(f"Step: {frame}")
 
     return drone_path, current_drone_pos, camera_pos, guard_pos, route_path
 

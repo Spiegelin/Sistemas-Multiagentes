@@ -1,7 +1,9 @@
 import asyncio
 import websockets
 import json
-from .. import model
+from Model import DronModel as model
+import UnityFunctions
+import ComputationalVision
 
 async def handler(websocket, path):
     while True:
