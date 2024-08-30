@@ -93,7 +93,7 @@ class GuardAgent(ap.Agent):
             self.false_alarm(drone)
 
     def trigger_alarm(self):
-        print("* ¡Alarma general! Peligro detectado.")
+        print("* ¡Alarma general! Peligro detectado. Esperando por 5 segundos.")
         time.sleep(5)
 
     def false_alarm(self, drone):
@@ -157,7 +157,7 @@ def update(frame):
     guard_pos.set_data([0], [0])
 
     # Steps
-    ax.set_title(f"Step: {frame}")
+    #ax.set_title(f"Step: {frame}")
 
     return drone_path, current_drone_pos, camera_pos, guard_pos, route_path
 
