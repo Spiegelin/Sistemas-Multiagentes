@@ -29,7 +29,7 @@ class DroneAgent(ap.Agent):
             print(f"$ Dron despega en {self.current_pos}")
             self.patrolling = True
             self.flighting = True
-        elif self.current_pos == self.model.start_position and self.flighting and not self.is_dangerous and self.finish_route: 
+        elif self.current_pos == self.model.start_position and self.previous_pos == self.model.route[-2] and self.flighting and not self.is_dangerous and self.finish_route: 
             print(f"$ Dron desciende en {self.current_pos}")
             print(f"$ Dron se espera por 10 segundos")
             time.sleep(10)

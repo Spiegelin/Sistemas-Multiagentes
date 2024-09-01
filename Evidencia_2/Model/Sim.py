@@ -25,7 +25,7 @@ class DroneAgent(ap.Agent):
             print(f"$ Dron despega en {self.current_pos}")
             self.patrolling = True
             self.flighting = True
-        elif self.current_pos == self.model.start_position and self.flighting and not self.is_dangerous and self.finish_route: 
+        elif self.current_pos == self.model.start_position and self.previous_pos == self.model.route[-2] and self.flighting and not self.is_dangerous and self.finish_route: 
             print(f"$ Dron desciende en {self.current_pos}")
             print(f"$ Dron se espera por 10 segundos")
             time.sleep(10)
@@ -86,7 +86,7 @@ class GuardAgent(ap.Agent):
 
     def take_control(self, drone, certainty, danger):
         print(f"* Guardia toma control del dron con certeza {certainty} y peligro {danger}")
-        danger = True if random.random() > 0.5 else False  # Simulación aleatoria de peligro
+        danger = True if random.random() > 0.8 else False  # Simulación aleatoria de peligro
         if certainty > 0.7 and danger:
             self.trigger_alarm()
         else:
@@ -158,6 +158,11 @@ def update(frame):
 
     # Steps
     #ax.set_title(f"Step: {frame}")
+    # Verificar si se han agotado los pasos
+    if frame == parameters['steps'] - 1:
+        print("Se han agotado todos los pasos. No todas las bases están llenas de cajas.")
+        print(f"Pasos totales: {model.t-1}")
+        plt.close(fig)  
 
     return drone_path, current_drone_pos, camera_pos, guard_pos, route_path
 
