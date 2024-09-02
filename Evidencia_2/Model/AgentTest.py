@@ -36,6 +36,8 @@ class DroneAgent(ap.Agent):
         self.flighting = False
         self.finish_route = False
         self.in_control = False
+        self.before_alert_pos = None
+        self.investigating = False
 
     def start_patrol(self):
         if self.current_pos == self.model.start_position and not self.flighting:
@@ -65,7 +67,10 @@ class DroneAgent(ap.Agent):
     def receive_alert(self, certainty, position):
         self.certainty = certainty
         self.target_pos = position
+        #if self.certainty and not self.investigating:
         if self.certainty > 0.5:
+            self.before_alert_pos = self.current_pos
+            #self.investigating = True
             self.investigate()
 
     def investigate(self):
@@ -84,6 +89,7 @@ class DroneAgent(ap.Agent):
         self.previous_pos = self.current_pos
         self.current_pos = position
         #UnityFunctions.move_to_next_position(position)
+        #self.investigate()?
 
     def revisar_mensajes(self):
         mensajes_drone = recibir_mensajes("dron")
@@ -91,6 +97,12 @@ class DroneAgent(ap.Agent):
             if "receive_alert" in mensaje:
                 alerta = mensaje["receive_alert"]
                 self.receive_alert(alerta["certainty"], alerta["position"])
+
+            if "return_to_route" in mensaje:
+                print(f"$ Dron regresa a su ruta en posición {self.current_pos}")
+                self.investigating = False
+                self.move_to(self.before_alert_pos)
+
 
 class CameraAgent(ap.Agent):
     def setup(self):
@@ -119,7 +131,7 @@ class GuardAgent(ap.Agent):
     def take_control(self, drone, certainty, danger):
         print(f"* Guardia toma control del dron con certeza {certainty} y peligro {danger}")
         #result = ComputationalVision.detect_danger() # Detectar peligro por visión computacional
-        # danger = True if result['danger'] == true else False
+        #danger = True if result['danger'] == true else False
         if certainty > 0.7 and danger:
             self.trigger_alarm()
         else:
@@ -129,12 +141,17 @@ class GuardAgent(ap.Agent):
         # Se regresa a Unity que se active la alarma
         #UnityFunctions.trigger_alarm()
         print("* ¡Alarma general! Peligro detectado.")
+        enviar_mensaje("dron", {"return_to_route": True})
+        print("Mensajes Dron: ", mensajes["dron"], end="\n\n")
+
 
     def false_alarm(self, drone):
         # Se regresa a Unity que fue falsa alarma y vuelva a la ruta
         #UnityFunctions.false_alarm()
         print("* Falsa alarma. El dron vuelve a su ruta.")
-        drone.move_to(drone.previous_pos)
+        enviar_mensaje("dron", {"return_to_route": True})
+        print("Mensajes Dron: ", mensajes["dron"], end="\n\n")
+
 
     def revisar_mensajes(self):
         mensajes_guardia = recibir_mensajes("guardia")

@@ -1,11 +1,27 @@
 from Ontology import Drone, Camera, Guard
 
-# Simulación del funcionamiento del modelo
 import agentpy as ap
 import random
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import time
+
+# Mensajes de simulación (usando un diccionario)
+mensajes = {}
+
+# Función para enviar un mensaje a un agente específico
+def enviar_mensaje(destinatario, contenido):
+    if destinatario not in mensajes:
+        mensajes[destinatario] = []
+    mensajes[destinatario].append(contenido)
+
+# Función para procesar los mensajes de un agente específico
+def recibir_mensajes(agente_id):
+    if agente_id in mensajes:
+        mensajes_recibidos = mensajes[agente_id]
+        del mensajes[agente_id]  # Limpiar mensajes una vez procesados
+        return mensajes_recibidos
+    return []
 
 class DroneAgent(ap.Agent):
     def setup(self):
@@ -19,6 +35,8 @@ class DroneAgent(ap.Agent):
         self.flighting = False
         self.finish_route = False
         self.in_control = False
+        self.before_alert_pos = None
+        self.investigating = False
 
     def start_patrol(self):
         if self.current_pos == self.model.start_position and not self.flighting:
@@ -32,73 +50,92 @@ class DroneAgent(ap.Agent):
         self.move_along_route()
 
     def move_along_route(self):
-        # Simula un movimiento circular a lo largo de una ruta predefinida
         if self.current_pos in self.model.route:
             index = self.model.route.index(self.current_pos)
             self.previous_pos = self.current_pos
             self.current_pos = self.model.route[(index + 1) % len(self.model.route)]
-
         if self.current_pos == self.model.start_position:
             self.finish_route = True
-            print(f"$ Dron terminó en su ruta")
+            print(f"$ Dron terminó su ruta")
 
     def receive_alert(self, certainty, position):
         self.certainty = certainty
         self.target_pos = position
-        if self.certainty > 0.5:
+        # Si la certeza es mayor a 0.5 y no está investigando ya, se inicia una investigación
+        if self.certainty > 0.5 and not self.investigating:
+            self.before_alert_pos = self.current_pos
+            #self.investigating = True
+            print(f"$ Posición del dron antes de investigar: {self.before_alert_pos}")
             self.investigate()
 
     def investigate(self):
-        # Se mueve a la posición objetivo y señala al guardia si es peligroso
         if self.current_pos != self.target_pos:
             self.move_to(self.target_pos)
         if self.certainty > 0.6:
-            print(f"$ Dron en posición {self.current_pos} señala peligro al guardia")
-            self.signal_guard()
-
-    def signal_guard(self):
-        guard = self.model.guard
-        guard.take_control(self, self.certainty, self.is_dangerous)
+            print(f"$ Dron en posición {self.current_pos} señala peligro al guardia por mensaje")
+            enviar_mensaje("guardia", {"take_control": {"certainty": self.certainty, "is_dangerous": self.is_dangerous}})
+            print("Mensajes Guardia: ", mensajes["guardia"], end="\n\n")
 
     def move_to(self, position):
         print(f"$ Dron se mueve de {self.current_pos} a {position}")
         self.previous_pos = self.current_pos
         self.current_pos = position
+        #print(f"$ Dron volviendo a investgar")
+        #self.investigate()
 
+    def revisar_mensajes(self):
+        mensajes_drone = recibir_mensajes("dron")
+        for mensaje in mensajes_drone:
+            if "receive_alert" in mensaje:
+                alerta = mensaje["receive_alert"]
+                self.receive_alert(alerta["certainty"], alerta["position"])
+            
+            if "return_to_route" in mensaje:
+                print(f"$ Dron regresa a su ruta en posición {self.current_pos}")
+                self.investigating = False
+                self.move_to(self.before_alert_pos)
 
 class CameraAgent(ap.Agent):
     def setup(self):
         self.owl_entity = Camera()
-        #self.id = self.id
 
     def detect_movement(self):
-        # Simular detección de movimiento
-        if random.random() > 0.7:  # Simulación aleatoria de movimiento detectado
+        if random.random() > 0.7:
             certainty = random.uniform(0.5, 0.9)
             position = random.choice(self.model.route)
-            #position = UnityFunctions.get_camera_position(self.id)
             print(f"- Cámara {self} detecta movimiento en {position} con certeza {certainty}")
-            self.model.drone.receive_alert(certainty, position)
+            enviar_mensaje("dron", {"receive_alert": {"certainty": certainty, "position": position}})
+            print("Mensajes Dron: ", mensajes["dron"], end="\n\n")
 
 class GuardAgent(ap.Agent):
     def setup(self):
         self.owl_entity = Guard()
 
-    def take_control(self, drone, certainty, danger):
+    def take_control(self, certainty, danger):
         print(f"* Guardia toma control del dron con certeza {certainty} y peligro {danger}")
-        danger = True if random.random() > 0.8 else False  # Simulación aleatoria de peligro
+        danger = True if random.random() > 0.8 else False
         if certainty > 0.7 and danger:
             self.trigger_alarm()
         else:
-            self.false_alarm(drone)
+            self.false_alarm()
 
     def trigger_alarm(self):
         print("* ¡Alarma general! Peligro detectado. Esperando por 5 segundos.")
+        enviar_mensaje("dron", {"return_to_route": True})
+        print("Mensajes Dron: ", mensajes["dron"], end="\n\n")
         time.sleep(5)
 
-    def false_alarm(self, drone):
+    def false_alarm(self):
         print("* Falsa alarma. El dron vuelve a su ruta.")
-        drone.move_to(drone.previous_pos)
+        enviar_mensaje("dron", {"return_to_route": True})
+        print("Mensajes Dron: ", mensajes["dron"], end="\n\n")
+
+    def revisar_mensajes(self):
+        mensajes_guardia = recibir_mensajes("guardia")
+        for mensaje in mensajes_guardia:
+            if "take_control" in mensaje:
+                control = mensaje["take_control"]
+                self.take_control(control["certainty"], control["is_dangerous"])
 
 # Modelo de seguridad
 class SecurityModel(ap.Model):
@@ -109,10 +146,12 @@ class SecurityModel(ap.Model):
 
         # Ruta predefinida para el dron
         self.start_position = (0, 0)
-        self.route = [(0, 0), (0, 1), (0, 2), (1, 2), (2, 2), (2, 1), (2, 0), (1, 0), (0, 0)]  # Ejemplo de ruta en bucle
+        self.route = [(0, 0), (0, 1), (0, 2), (1, 2), (2, 2), (2, 1), (2, 0), (1, 0), (0, 0)]
 
     def step(self):
         self.drone.start_patrol()
+        self.drone.revisar_mensajes()
+        self.guard.revisar_mensajes()
         for camera in self.cameras:
             camera.detect_movement()
 
@@ -140,11 +179,11 @@ def update(frame):
     model.step()
 
     # Actualizar la posición del dron
-    drone_positions = [model.drone.current_pos]  # La posición actual del dron
+    drone_positions = [model.drone.current_pos]
     drone_path.set_data(*zip(*[model.drone.previous_pos, model.drone.current_pos] if model.drone.previous_pos else [(0, 0)]))
     current_drone_pos.set_data(*zip(*drone_positions))
 
-    # Actualizar la ruta del dron (línea discontinua)
+    # Actualizar la ruta del dron
     route_positions = model.route
     route_path.set_data(*zip(*route_positions))
 
@@ -153,15 +192,11 @@ def update(frame):
     cx, cy = zip(*cam_positions)
     camera_pos.set_data(cx, cy)
 
-    # Posición del guardia (no se mueve en este ejemplo)
+    # Posición del guardia
     guard_pos.set_data([0], [0])
 
-    # Steps
-    #ax.set_title(f"Step: {frame}")
-    # Verificar si se han agotado los pasos
     if frame == parameters['steps'] - 1:
-        print("Se han agotado todos los pasos. No todas las bases están llenas de cajas.")
-        print(f"Pasos totales: {model.t-1}")
+        print("Se han agotado todos los pasos.")
         plt.close(fig)  
 
     return drone_path, current_drone_pos, camera_pos, guard_pos, route_path

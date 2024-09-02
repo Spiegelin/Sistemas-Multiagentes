@@ -16,7 +16,9 @@ class SecurityModel(ap.Model):
 
     def step(self):
         self.drone.start_patrol()
+        self.drone.revisar_mensajes()
+        self.guard.revisar_mensajes()
         for camera in self.cameras:
             camera.detect_movement()
 
-        self.guard.step() # Borrar?
+        #self.guard.step() # Borrar?
