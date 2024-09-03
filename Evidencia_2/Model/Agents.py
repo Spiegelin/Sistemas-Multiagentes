@@ -12,7 +12,13 @@ mensajes = {}
 def enviar_mensaje(destinatario, contenido):
     if destinatario not in mensajes:
         mensajes[destinatario] = []
-    mensajes[destinatario].append(contenido)
+    
+    # Solo agregar el mensaje si la lista está vacía
+    if not mensajes[destinatario] and not len(mensajes[destinatario]) > 0:
+        mensajes[destinatario].append(contenido)
+    else:
+        print(f"$ Mensaje ignorado: ya se tiene una alerta pendiente.")
+
 
 # Función para procesar los mensajes de un agente específico
 def recibir_mensajes(agente_id):
@@ -36,6 +42,8 @@ class DroneAgent(ap.Agent):
         self.flighting = False
         self.finish_route = False
         self.in_control = False
+        self.before_alert_pos = None
+        self.investigating = False
 
     def start_patrol(self):
         if self.current_pos == self.model.start_position and not self.flighting:
@@ -43,39 +51,59 @@ class DroneAgent(ap.Agent):
             self.patrolling = True
             self.flighting = True
         elif self.current_pos == self.model.start_position and self.previous_pos == self.model.route[-2] and self.flighting and not self.is_dangerous and self.finish_route: 
-            print(f"$ Dron desciende en {self.current_pos}")
-            print(f"$ Dron se espera por 10 segundos")
-            time.sleep(10)
-            #UnityFunctions.end_route()
+            self.end_route()
         self.move_along_route()
 
     def move_along_route(self):
         # Movimiento en ruta predefinida
         # Solo se regresaría a Unity que se mueva a la siguiente posición
         # Lógica de movimiento...
+        #if self.current_pos in self.model.route:
+         #   index = self.model.route.index(self.current_pos)
+          #  self.previous_pos = self.current_pos
+           # self.current_pos = self.model.route[(index + 1) % len(self.model.route)]
+            #print(f"$ Dron se mueve a {self.current_pos}")
+
 
 
         # Si la posición actual es la de inicio, se termina la ruta
         if self.current_pos == self.model.start_position:
-            self.finish_route = True
-            #UnityFunctions.end_route()
-            print(f"$ Dron terminó su ruta")
+            self.end_route()
         pass
 
+    def end_route(self):
+        print(f"$ Dron terminó su ruta")
+        print(f"$ Dron desciende en {self.current_pos}")
+        print(f"$ Dron se espera por 10 segundos")
+        self.flighting = False
+        self.finish_route = False   
+        #UnityFunctions.end_route()
+
     def receive_alert(self, certainty, position):
-        self.certainty = certainty
-        self.target_pos = position
-        if self.certainty > 0.5:
-            self.investigate()
+        if not self.investigating:
+            self.certainty = certainty
+            self.target_pos = position
+
+            # Si la certeza es mayor a 0.5 y no está investigando ya, se inicia una investigación
+            if self.certainty > 0.5:
+                self.before_alert_pos = self.current_pos
+                self.investigating = True
+                print(f"$ Posición del dron antes de investigar: {self.before_alert_pos}")
+                self.investigate()
 
     def investigate(self):
         # Se mueve a la posición objetivo y señala al guardia si es peligroso
         if self.current_pos != self.target_pos:
             self.move_to(self.target_pos)
+
+        #self.certainty = UnityFunctions.getCertainty()
         if self.certainty > 0.6:
             print(f"$ Dron en posición {self.current_pos} señala peligro al guardia por mensaje")
             enviar_mensaje("guardia", {"take_control": {"certainty": self.certainty, "is_dangerous": self.is_dangerous}})
             print("Mensajes Guardia: ", mensajes["guardia"], end="\n\n")
+        else:
+            print(f"$ Dron en posición {self.current_pos} no detectó peligro.")
+            self.move_to(self.before_alert_pos)
 
     def move_to(self, position):
         # Lógica de movimiento hacia una posición específica
@@ -86,27 +114,32 @@ class DroneAgent(ap.Agent):
         #UnityFunctions.move_to_next_position(position)
 
     def revisar_mensajes(self):
-        mensajes_drone = recibir_mensajes("dron")
-        for mensaje in mensajes_drone:
-            if "receive_alert" in mensaje:
-                alerta = mensaje["receive_alert"]
-                self.receive_alert(alerta["certainty"], alerta["position"])
+        if not self.investigating:
+            mensajes_drone = recibir_mensajes("dron")
+            for mensaje in mensajes_drone:
+                if "receive_alert" in mensaje:
+                    alerta = mensaje["receive_alert"]
+                    self.receive_alert(alerta["certainty"], alerta["position"])
+                
+                if "return_to_route" in mensaje:
+                    print(f"$ Dron regresa a su ruta en posición {self.before_alert_pos}")
+                    self.investigating = False
+                    self.move_to(self.before_alert_pos)
+
 
 class CameraAgent(ap.Agent):
     def setup(self):
         self.owl_entity = Camera()
 
     def detect_movement(self):
-        # Simular detección de movimiento y llamar al dron si es necesario
+        # Simular detección de maldad? y llamar al dron si es necesario
         """
         result = ComputationalVision.camera_detection()
-        if result['certainty'] > 0.5:
-            position = self.model.grid.positions[self]
+        certainty = result['certainty']
+        if certainty > 0.5:
+            position = UnityFunctions.get_camera_position(self)
             enviar_mensaje("dron", {"receive_alert": {"certainty": certainty, "position": position}})
-
-            #drone.move_to(UnityFunctions.get_camera_position(self))
-            print(f"- {self}: Aviso al dron sobre una posible amenaza.")
-            #print(f"- Cámara detecta movimiento en {self.model.grid.positions[self]} con certeza {result['certainty']}")
+            print(f"- {self}: Aviso al dron sobre una posible amenaza en {position} con certeza {result['certainty']}.")
             print("Mensajes Dron: ", mensajes["dron"], end="\n\n")
 
             """
@@ -116,25 +149,30 @@ class GuardAgent(ap.Agent):
     def setup(self):
         self.owl_entity = Guard()
 
-    def take_control(self, drone, certainty, danger):
+    def take_control(self, certainty, danger):
         print(f"* Guardia toma control del dron con certeza {certainty} y peligro {danger}")
         #result = ComputationalVision.detect_danger() # Detectar peligro por visión computacional
         # danger = True if result['danger'] == true else False
         if certainty > 0.7 and danger:
             self.trigger_alarm()
         else:
-            self.false_alarm(drone)
+            self.false_alarm()
 
     def trigger_alarm(self):
         # Se regresa a Unity que se active la alarma
         #UnityFunctions.trigger_alarm()
         print("* ¡Alarma general! Peligro detectado.")
+        enviar_mensaje("dron", {"return_to_route": True})
+        print("Mensajes Dron: ", mensajes["dron"], end="\n\n")
 
-    def false_alarm(self, drone):
+
+    def false_alarm(self):
         # Se regresa a Unity que fue falsa alarma y vuelva a la ruta
         #UnityFunctions.false_alarm()
         print("* Falsa alarma. El dron vuelve a su ruta.")
-        drone.move_to(drone.previous_pos)
+        enviar_mensaje("dron", {"return_to_route": True})
+        print("Mensajes Dron: ", mensajes["dron"], end="\n\n")
+
 
     def revisar_mensajes(self):
         mensajes_guardia = recibir_mensajes("guardia")

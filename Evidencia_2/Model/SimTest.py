@@ -13,13 +13,7 @@ mensajes = {}
 def enviar_mensaje(destinatario, contenido):
     if destinatario not in mensajes:
         mensajes[destinatario] = []
-    
-    # Solo agregar el mensaje si la lista está vacía
-    if not mensajes[destinatario] and not len(mensajes[destinatario]) > 0:
-        mensajes[destinatario].append(contenido)
-    else:
-        print(f"$ Mensaje ignorado: ya se tiene una alerta pendiente.")
-
+    mensajes[destinatario].append(contenido)
 
 # Función para procesar los mensajes de un agente específico
 def recibir_mensajes(agente_id):
@@ -50,7 +44,9 @@ class DroneAgent(ap.Agent):
             self.patrolling = True
             self.flighting = True
         elif self.current_pos == self.model.start_position and self.previous_pos == self.model.route[-2] and self.flighting and not self.is_dangerous and self.finish_route: 
-            self.end_route()
+            print(f"$ Dron desciende en {self.current_pos}")
+            print(f"$ Dron se espera por 10 segundos")
+            time.sleep(10)
         self.move_along_route()
 
     def move_along_route(self):
@@ -58,62 +54,46 @@ class DroneAgent(ap.Agent):
             index = self.model.route.index(self.current_pos)
             self.previous_pos = self.current_pos
             self.current_pos = self.model.route[(index + 1) % len(self.model.route)]
-            print(f"$ Dron se mueve a {self.current_pos}")
         if self.current_pos == self.model.start_position:
-            self.end_route()
-
-    def end_route(self):
-        print(f"$ Dron terminó su ruta")
-        print(f"$ Dron desciende en {self.current_pos}")
-        print(f"$ Dron se espera por 10 segundos")
-        self.flighting = False
-        self.finish_route = False   
-        time.sleep(10)
+            self.finish_route = True
+            print(f"$ Dron terminó su ruta")
 
     def receive_alert(self, certainty, position):
-        if not self.investigating:
-            self.certainty = certainty
-            self.target_pos = position
-
-            # Si la certeza es mayor a 0.5 y no está investigando ya, se inicia una investigación
-            if self.certainty > 0.5:
-                self.before_alert_pos = self.current_pos
-                self.investigating = True
-                print(f"$ Posición del dron antes de investigar: {self.before_alert_pos}")
-                self.investigate()
+        self.certainty = certainty
+        self.target_pos = position
+        # Si la certeza es mayor a 0.5 y no está investigando ya, se inicia una investigación
+        if self.certainty > 0.5 and not self.investigating:
+            self.before_alert_pos = self.current_pos
+            #self.investigating = True
+            print(f"$ Posición del dron antes de investigar: {self.before_alert_pos}")
+            self.investigate()
 
     def investigate(self):
         if self.current_pos != self.target_pos:
             self.move_to(self.target_pos)
-        #self.certainty = UnityFunctions.getCertainty()
         if self.certainty > 0.6:
             print(f"$ Dron en posición {self.current_pos} señala peligro al guardia por mensaje")
             enviar_mensaje("guardia", {"take_control": {"certainty": self.certainty, "is_dangerous": self.is_dangerous}})
             print("Mensajes Guardia: ", mensajes["guardia"], end="\n\n")
-        else:
-            print(f"$ Dron en posición {self.current_pos} no detectó peligro.")
-            self.move_to(self.before_alert_pos)
-        
-        # Terminó de investigar el dron
-        self.investigating = False
 
     def move_to(self, position):
         print(f"$ Dron se mueve de {self.current_pos} a {position}")
         self.previous_pos = self.current_pos
         self.current_pos = position
+        #print(f"$ Dron volviendo a investgar")
+        #self.investigate()
 
     def revisar_mensajes(self):
-        if not self.investigating:
-            mensajes_drone = recibir_mensajes("dron")
-            for mensaje in mensajes_drone:
-                if "receive_alert" in mensaje:
-                    alerta = mensaje["receive_alert"]
-                    self.receive_alert(alerta["certainty"], alerta["position"])
-                
-                if "return_to_route" in mensaje:
-                    print(f"$ Dron regresa a su ruta en posición {self.before_alert_pos}")
-                    self.investigating = False
-                    self.move_to(self.before_alert_pos)
+        mensajes_drone = recibir_mensajes("dron")
+        for mensaje in mensajes_drone:
+            if "receive_alert" in mensaje:
+                alerta = mensaje["receive_alert"]
+                self.receive_alert(alerta["certainty"], alerta["position"])
+            
+            if "return_to_route" in mensaje:
+                print(f"$ Dron regresa a su ruta en posición {self.current_pos}")
+                self.investigating = False
+                self.move_to(self.before_alert_pos)
 
 class CameraAgent(ap.Agent):
     def setup(self):
@@ -167,16 +147,13 @@ class SecurityModel(ap.Model):
         # Ruta predefinida para el dron
         self.start_position = (0, 0)
         self.route = [(0, 0), (0, 1), (0, 2), (1, 2), (2, 2), (2, 1), (2, 0), (1, 0), (0, 0)]
-        self.steps = 0
 
     def step(self):
-        self.steps += 1
         self.drone.start_patrol()
         self.drone.revisar_mensajes()
         self.guard.revisar_mensajes()
         for camera in self.cameras:
             camera.detect_movement()
-        print(f"---------------Step {self.steps}----------------")
 
 # Parámetros de la simulación
 parameters = {
