@@ -1,9 +1,10 @@
 import agentpy as ap
+import ComputationalVision.get_certainty
 from Ontology import Drone, Camera, Guard
 import random
 import time
-# import UnityFunctions
-# import ComputationalVision
+import UnityFunctions
+import ComputationalVision
 
 # Mensajes de simulación (usando un diccionario)
 mensajes = {}
@@ -32,11 +33,9 @@ class DroneAgent(ap.Agent):
     def setup(self):
         self.owl_entity = Drone()
         self.patrolling = False
-        self.current_pos = (0, 0)
-        #self.current_pos = UnityFunctions.get_dron_position()
+        self.current_pos = UnityFunctions.get_dron_position() # (x,y,z)
         self.previous_pos = None
-        self.certainty = 0.0
-        # self.certainty = ComputationalVision.get_certainty()
+        self.certainty = ComputationalVision.get_certainty() # 0 .. 1
         self.is_dangerous = False
         self.target_pos = None
         self.flighting = False
@@ -50,22 +49,17 @@ class DroneAgent(ap.Agent):
             print(f"$ Dron despega en {self.current_pos}")
             self.patrolling = True
             self.flighting = True
+            UnityFunctions.take_off()
         elif self.current_pos == self.model.start_position and self.previous_pos == self.model.route[-2] and self.flighting and not self.is_dangerous and self.finish_route: 
             self.end_route()
         self.move_along_route()
 
     def move_along_route(self):
         # Movimiento en ruta predefinida
-        # Solo se regresaría a Unity que se mueva a la siguiente posición
-        # Lógica de movimiento...
-        #if self.current_pos in self.model.route:
-         #   index = self.model.route.index(self.current_pos)
-          #  self.previous_pos = self.current_pos
-           # self.current_pos = self.model.route[(index + 1) % len(self.model.route)]
-            #print(f"$ Dron se mueve a {self.current_pos}")
-
-
-
+        self.previous_pos = self.current_pos
+        self.current_pos = UnityFunctions.next_position()
+        print(f"$ Dron se mueve a {self.current_pos}")
+        
         # Si la posición actual es la de inicio, se termina la ruta
         if self.current_pos == self.model.start_position:
             self.end_route()
@@ -77,7 +71,7 @@ class DroneAgent(ap.Agent):
         print(f"$ Dron se espera por 10 segundos")
         self.flighting = False
         self.finish_route = False   
-        #UnityFunctions.end_route()
+        UnityFunctions.end_route()
 
     def receive_alert(self, certainty, position):
         if not self.investigating:
@@ -96,7 +90,9 @@ class DroneAgent(ap.Agent):
         if self.current_pos != self.target_pos:
             self.move_to(self.target_pos)
 
-        #self.certainty = UnityFunctions.getCertainty()
+        # Ya que llegó a la posición objetivo, se verifica si es peligroso
+        self.certainty = ComputationalVision.getCertainty()
+        self.is_dangerous = ComputationalVision.detect_danger()
         if self.certainty > 0.6:
             print(f"$ Dron en posición {self.current_pos} señala peligro al guardia por mensaje")
             enviar_mensaje("guardia", {"take_control": {"certainty": self.certainty, "is_dangerous": self.is_dangerous}})
@@ -111,7 +107,7 @@ class DroneAgent(ap.Agent):
         print(f"$ Dron se mueve de {self.current_pos} a {position}")
         self.previous_pos = self.current_pos
         self.current_pos = position
-        #UnityFunctions.move_to_next_position(position)
+        position = UnityFunctions.move_to(position)
 
     def revisar_mensajes(self):
         if not self.investigating:
@@ -133,17 +129,13 @@ class CameraAgent(ap.Agent):
 
     def detect_movement(self):
         # Simular detección de maldad? y llamar al dron si es necesario
-        """
-        result = ComputationalVision.camera_detection()
-        certainty = result['certainty']
+        certainty = ComputationalVision.getCertainty()
+        #danger = ComputationalVision.detect_danger()
         if certainty > 0.5:
             position = UnityFunctions.get_camera_position(self)
             enviar_mensaje("dron", {"receive_alert": {"certainty": certainty, "position": position}})
-            print(f"- {self}: Aviso al dron sobre una posible amenaza en {position} con certeza {result['certainty']}.")
+            print(f"- {self}: Aviso al dron sobre una posible amenaza en {position} con certeza {certainty}.")
             print("Mensajes Dron: ", mensajes["dron"], end="\n\n")
-
-            """
-        pass
 
 class GuardAgent(ap.Agent):
     def setup(self):
@@ -151,8 +143,10 @@ class GuardAgent(ap.Agent):
 
     def take_control(self, certainty, danger):
         print(f"* Guardia toma control del dron con certeza {certainty} y peligro {danger}")
-        #result = ComputationalVision.detect_danger() # Detectar peligro por visión computacional
-        # danger = True if result['danger'] == true else False
+        # Se tomaría control del dron y se verifica si es peligroso
+        UnityFunctions.take_control()
+        certainty = ComputationalVision.getCertainty() # Obtener certeza de la visión computacional después de tomar control
+        danger = ComputationalVision.detect_danger() # Detectar peligro por visión computacional
         if certainty > 0.7 and danger:
             self.trigger_alarm()
         else:
@@ -160,18 +154,18 @@ class GuardAgent(ap.Agent):
 
     def trigger_alarm(self):
         # Se regresa a Unity que se active la alarma
-        #UnityFunctions.trigger_alarm()
         print("* ¡Alarma general! Peligro detectado.")
         enviar_mensaje("dron", {"return_to_route": True})
         print("Mensajes Dron: ", mensajes["dron"], end="\n\n")
+        UnityFunctions.trigger_alarm()
 
 
     def false_alarm(self):
         # Se regresa a Unity que fue falsa alarma y vuelva a la ruta
-        #UnityFunctions.false_alarm()
         print("* Falsa alarma. El dron vuelve a su ruta.")
         enviar_mensaje("dron", {"return_to_route": True})
         print("Mensajes Dron: ", mensajes["dron"], end="\n\n")
+        UnityFunctions.false_alarm()
 
 
     def revisar_mensajes(self):
