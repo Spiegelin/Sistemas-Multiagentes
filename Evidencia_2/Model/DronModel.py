@@ -3,7 +3,7 @@ import os
 import agentpy as ap
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
-from Agents import DroneAgent, CameraAgent, GuardAgent
+from .Agents import DroneAgent, CameraAgent, GuardAgent
 from UnityFunctions import get_start_position, get_route
 
 class SecurityModel(ap.Model):

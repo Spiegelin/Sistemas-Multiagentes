@@ -1,2 +1,0 @@
-from .get_camera_position import get_camera_position
-from .get_dron_position import get_dron_position
