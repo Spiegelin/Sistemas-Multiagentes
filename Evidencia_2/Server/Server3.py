@@ -11,74 +11,75 @@ from Model import DronModel as model
 import UnityFunctions
 
 async def handler(websocket, path):
-    if path == "/dron":
-        print("Conexión establecida en la ruta /dron")
-        try:
-            # Enviar el mensaje de solicitud de la posición del dron
-            message = "Dame la posicion"
-            await websocket.send(message)
-            print(f"Mensaje enviado a Unity: {message}")
-
-            # Esperar la respuesta de Unity
-            response = await websocket.recv()
-            position_data = json.loads(response)
-            print(f"Posición del dron recibida: {position_data['pos']}")
-
-        except websockets.ConnectionClosed:
-            print("Conexión cerrada en /dron")
-
-    elif path == "/camara":
+    if path == "/camara":
         print("Conexión establecida en la ruta /camara")
         try:
-            # Enviar el mensaje de solicitud de la posición de la cámara
+            # Enviar mensaje a Unity
             message = "Dame la posicion de la camara"
             await websocket.send(message)
             print(f"Mensaje enviado a Unity: {message}")
 
-            # Esperar la respuesta de Unity
+            # Esperar respuesta de Unity
             response = await websocket.recv()
-            position_data = json.loads(response)
-            print(f"Posición de la cámara recibida: {position_data['pos']}")
+            print(f"Respuesta de Unity: {response}")
 
+            if response:
+                position_data = json.loads(response)
+                print(f"Posición de la cámara recibida: {position_data['pos']}")
+            else:
+                print("Respuesta vacía o no válida recibida de Unity")
+
+        except json.JSONDecodeError as e:
+            print(f"Error de decodificación de JSON: {e}")
         except websockets.ConnectionClosed:
             print("Conexión cerrada en /camara")
 
-    else:
-        while True:
-            try:
-                data = await websocket.recv()
-                print("DATA: ", data)
-                data = json.loads(data)
-                print("DATA JSON: ", data)
+    elif path == "/dron":
+        print("Conexión establecida en la ruta /dron")
+        try:
+            # Enviar mensaje a Unity
+            message = "Dame la posicion del dron"
+            await websocket.send(message)
+            print(f"Mensaje enviado a Unity: {message}")
 
-                # Procesar la información de las cámaras o el dron
-                if "camera_alert" in data:
-                    certainty = data['certainty']
-                    position = data['position']
-                    drone = model.drone
-                    drone.receive_alert(certainty, position)
+            # Esperar respuesta de Unity
+            response = await websocket.recv()
+            print(f"Respuesta de Unity: {response}")
 
-                elif "drone_position" in data:
-                    drone = model.drone
-                    drone.current_pos = data['position']
+            if response:
+                position_data = json.loads(response)
+                print(f"Posición del dron recibida: {position_data['pos']}")
+            else:
+                print("Respuesta vacía o no válida recibida de Unity")
 
-                if "take_off_command" in data:
-                    await UnityFunctions.take_off()
+        except json.JSONDecodeError as e:
+            print(f"Error de decodificación de JSON: {e}")
+        except websockets.ConnectionClosed:
+            print("Conexión cerrada en /dron")
 
-                response = {
-                    'Hola': '2'
-                }
+    else:  # Manejar la ruta raíz
+        print("Conexión establecida en la ruta raíz /")
+        try:
+            while True:
+                # Mantener la conexión abierta y escuchar mensajes
+                message = await websocket.recv()
+                print(f"Mensaje recibido en /: {message}")
+
+                # Procesar mensaje recibido o responder
+                response = {"status": "connected to /"}
                 await websocket.send(json.dumps(response))
 
-            except websockets.ConnectionClosed:
-                print("Conexión cerrada")
-                break
+        except websockets.ConnectionClosed:
+            print("Conexión cerrada en /")
+        except Exception as e:
+            print(f"Error en la ruta raíz: {e}")
 
 async def main():
     # Iniciar el servidor WebSocket
     start_server = websockets.serve(handler, 'localhost', 8765)
     await start_server
 
+# Ejecutar el bucle de eventos existente
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())
 loop.run_forever()
