@@ -1,7 +1,6 @@
 import sys
 import os
 import agentpy as ap
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
 from Agents import DroneAgent, CameraAgent, GuardAgent

@@ -1,6 +1,6 @@
 import agentpy as ap
 import ComputationalVision.get_certainty
-from Ontology import Drone, Camera, Guard
+from .Ontology import Drone, Camera, Guard
 import random
 import time
 import UnityFunctions
@@ -35,7 +35,7 @@ class DroneAgent(ap.Agent):
         self.patrolling = False
         self.current_pos = UnityFunctions.get_dron_position() # (x,y,z)
         self.previous_pos = None
-        self.certainty = ComputationalVision.get_certainty() # 0 .. 1
+        self.certainty = ComputationalVision.get_dron_certainty() # 0 .. 1
         self.is_dangerous = False
         self.target_pos = None
         self.flighting = False
@@ -91,7 +91,7 @@ class DroneAgent(ap.Agent):
             self.move_to(self.target_pos)
 
         # Ya que llegó a la posición objetivo, se verifica si es peligroso
-        self.certainty = ComputationalVision.getCertainty()
+        self.certainty = ComputationalVision.get_dron_certainty()
         self.is_dangerous = ComputationalVision.detect_danger()
         if self.certainty > 0.6:
             print(f"$ Dron en posición {self.current_pos} señala peligro al guardia por mensaje")
@@ -129,10 +129,10 @@ class CameraAgent(ap.Agent):
 
     def detect_movement(self):
         # Simular detección de maldad? y llamar al dron si es necesario
-        certainty = ComputationalVision.getCertainty()
+        position = UnityFunctions.get_camera_position(self)
+        certainty = ComputationalVision.get_certainty(position)
         #danger = ComputationalVision.detect_danger()
         if certainty > 0.5:
-            position = UnityFunctions.get_camera_position(self)
             enviar_mensaje("dron", {"receive_alert": {"certainty": certainty, "position": position}})
             print(f"- {self}: Aviso al dron sobre una posible amenaza en {position} con certeza {certainty}.")
             print("Mensajes Dron: ", mensajes["dron"], end="\n\n")
@@ -145,7 +145,7 @@ class GuardAgent(ap.Agent):
         print(f"* Guardia toma control del dron con certeza {certainty} y peligro {danger}")
         # Se tomaría control del dron y se verifica si es peligroso
         UnityFunctions.take_control()
-        certainty = ComputationalVision.getCertainty() # Obtener certeza de la visión computacional después de tomar control
+        certainty = ComputationalVision.get_dron_certainty() # Obtener certeza de la visión computacional después de tomar control
         danger = ComputationalVision.detect_danger() # Detectar peligro por visión computacional
         if certainty > 0.7 and danger:
             self.trigger_alarm()

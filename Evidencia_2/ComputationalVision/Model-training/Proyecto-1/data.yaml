@@ -1,0 +1,13 @@
+names:
+  - bad
+  - good
+nc: 2
+roboflow:
+  license: Public Domain
+  project: proyecto-x3v5s
+  url: https://universe.roboflow.com/multiagentes-zgh24/proyecto-x3v5s/dataset/1
+  version: 1
+  workspace: multiagentes-zgh24
+test: C:/Users/luisf/OneDrive/Documentos/Coding/Tec/Sistemas multiagentes con graficas computacionales/Prueba1/Proyecto-1/test/images
+train: C:/Users/luisf/OneDrive/Documentos/Coding/Tec/Sistemas multiagentes con graficas computacionales/Prueba1/Proyecto-1/train/images
+val: C:/Users/luisf/OneDrive/Documentos/Coding/Tec/Sistemas multiagentes con graficas computacionales/Prueba1/Proyecto-1/valid/images
