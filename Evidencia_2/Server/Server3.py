@@ -10,19 +10,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Model import DronModel as model
 import UnityFunctions
 
-async def test_connection():
-    uri = "ws://localhost:8765/dron"
-    async with websockets.connect(uri) as websocket:
-        # Enviar un mensaje de prueba
-        test_message = "Dame la pos"
-        await websocket.send(test_message)
-        print(f"Mensaje enviado: {test_message}")
-
-        # Recibir la respuesta del servidor
-        response = await websocket.recv()
-        response_data = json.loads(response)
-        print(f"Respuesta recibida: {response_data}")
-
 async def handler(websocket, path):
     if path == "/dron":
         print("Conexión establecida en la ruta /dron")
@@ -36,9 +23,6 @@ async def handler(websocket, path):
             response = await websocket.recv()
             position_data = json.loads(response)
             print(f"Posición del dron recibida: {position_data['pos']}")
-            # Esperar el mensaje de respuesta
-            message = await websocket.recv()
-            print(f"Mensaje recibido en /dron: {message}")
 
         except websockets.ConnectionClosed:
             print("Conexión cerrada en /dron")
