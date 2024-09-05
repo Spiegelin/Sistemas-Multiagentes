@@ -12,48 +12,45 @@ import UnityFunctions
 
 async def handler(websocket, path):
     if path == "/camara":
-        print("Conexión establecida en la ruta /camara")
         try:
-            # Enviar mensaje a Unity
-            message = "Dame la posicion de la camara"
-            await websocket.send(message)
-            print(f"Mensaje enviado a Unity: {message}")
+            # Ejecutar la función para obtener la posición de la cámara
+            position = await UnityFunctions.get_camera_position()
+            # Enviar la posición de la cámara al cliente
+            response_message = json.dumps({"pos": position})
+            await websocket.send(response_message)
 
-            # Esperar respuesta de Unity
-            response = await websocket.recv()
-            print(f"Respuesta de Unity: {response}")
+        except Exception as e:
+            print(f"Error en /camara: {e}")
 
-            if response:
-                position_data = json.loads(response)
-                print(f"Posición de la cámara recibida: {position_data['pos']}")
-            else:
-                print("Respuesta vacía o no válida recibida de Unity")
-
-        except json.JSONDecodeError as e:
-            print(f"Error de decodificación de JSON: {e}")
-        except websockets.ConnectionClosed:
-            print("Conexión cerrada en /camara")
 
     elif path == "/dron":
         print("Conexión establecida en la ruta /dron")
         try:
-            # Enviar mensaje a Unity
-            message = "Dame la posicion del dron"
-            await websocket.send(message)
-            print(f"Mensaje enviado a Unity: {message}")
+            async for message in websocket:
+                print(f"Mensaje recibido en /dron: {message}")
 
-            # Esperar respuesta de Unity
-            response = await websocket.recv()
-            print(f"Respuesta de Unity: {response}")
+                try:
+                    data = json.loads(message)
+                    action = data.get('action')
+                    position = data.get('position')
 
-            if response:
-                position_data = json.loads(response)
-                print(f"Posición del dron recibida: {position_data['pos']}")
-            else:
-                print("Respuesta vacía o no válida recibida de Unity")
+                    if action == "move_to" and position:
+                        # Enviar comando de movimiento al dron
+                        move_message = f"muevete a {position}"
+                        await websocket.send(move_message)
+                        print(f"Comando de movimiento enviado: {move_message}")
 
-        except json.JSONDecodeError as e:
-            print(f"Error de decodificación de JSON: {e}")
+                    elif action is None:
+                        # Por defecto, solicita la posición del dron
+                        request_message = "Dame la posicion del dron"
+                        await websocket.send(request_message)
+                        print(f"Mensaje enviado para solicitar posición del dron: {request_message}")
+
+                except json.JSONDecodeError as e:
+                    print(f"Error de decodificación de JSON: {e}")
+                except Exception as e:
+                    print(f"Error al procesar el mensaje: {e}")
+
         except websockets.ConnectionClosed:
             print("Conexión cerrada en /dron")
 
@@ -61,11 +58,9 @@ async def handler(websocket, path):
         print("Conexión establecida en la ruta raíz /")
         try:
             while True:
-                # Mantener la conexión abierta y escuchar mensajes
                 message = await websocket.recv()
                 print(f"Mensaje recibido en /: {message}")
 
-                # Procesar mensaje recibido o responder
                 response = {"status": "connected to /"}
                 await websocket.send(json.dumps(response))
 
@@ -75,11 +70,9 @@ async def handler(websocket, path):
             print(f"Error en la ruta raíz: {e}")
 
 async def main():
-    # Iniciar el servidor WebSocket
     start_server = websockets.serve(handler, 'localhost', 8765)
     await start_server
 
-# Ejecutar el bucle de eventos existente
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())
 loop.run_forever()
