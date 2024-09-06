@@ -6,7 +6,7 @@ import json
 import agentpy as ap
 import time
 from UnityFunctions.UnityFunctions import *
-from ComputationalVision.get import get_certainty, get_dron_certainty
+from ComputationalVision.serverModel import get_certainty
 from owlready2 import *
 
 #

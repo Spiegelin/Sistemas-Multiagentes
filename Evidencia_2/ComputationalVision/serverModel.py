@@ -41,7 +41,7 @@ async def send_predictions_to_server(predictions):
         logging.error(f"Failed to send predictions to the server: {e}")
 '''
 
-def get_certainty(cam_id=-1):
+def get_certainty(cam_id=10):
     certainty = None
 
     try:
