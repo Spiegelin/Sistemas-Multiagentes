@@ -181,8 +181,7 @@ class CameraAgent(ap.Agent):
         
     async def detect_movement(self):
         # Simular detección de maldad? y llamar al dron si es necesario
-        #position = await get_camera_position(self.id)
-        position = await get_camera_position()
+        position = await get_camera_position(self.id)
         certainty = get_certainty(self.id)
         #danger = ComputationalVision.detect_danger()
         if certainty > 0.5:
