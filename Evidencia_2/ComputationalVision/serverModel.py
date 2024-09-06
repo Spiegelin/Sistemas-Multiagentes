@@ -41,12 +41,47 @@ async def send_predictions_to_server(predictions):
         logging.error(f"Failed to send predictions to the server: {e}")
 '''
 
-def get_model():
-    return model
+def get_certainty(cam_id=-1):
+    certainty = None
 
-def detect_objects(img):
-    results = model.track(img, persist=True)
-    return results
+    try:
+        # Cargar la imagen de depuración de la cámara
+        img = cv2.imread(f'debug_frame_{cam_id}.jpg')
+
+        if img is None:
+            logging.error(f"No se pudo cargar la imagen para la cámara: {cam_id}")
+            return None
+
+        # Ejecutar el modelo YOLO en la imagen
+        results = model.predict(img)
+
+        # Acceder a las cajas de detección (boxes) para obtener el valor de certeza
+        if results and len(results) > 0:
+            if results[0].boxes is not None:
+                boxes = results[0].boxes  # Obtener las cajas de detección
+                confidences = boxes.conf  # Acceder a la confianza de cada detección
+                class_ids = boxes.cls  # IDs de las clases detectadas
+
+                # Obtener los nombres de las clases del modelo
+                class_names = model.names
+
+                # Filtrar por la clase 'bad' y obtener la certeza más alta
+                for i, class_id in enumerate(class_ids):
+                    class_name = class_names[int(class_id)]  # Obtener el nombre de la clase
+                    if class_name == 'bad':  # Verificar si la clase es 'bad'
+                        certainty = confidences[i]  # Tomar la certeza asociada
+                        logging.info(f"Detección de 'bad' con certeza: {certainty}")
+                        break  # Salir del bucle si encontramos una detección 'bad'
+
+                if certainty is None:
+                    logging.warning(f"No se encontraron detecciones de 'bad' para la cámara: {cam_id}")
+            else:
+                logging.warning(f"No hay cajas de detección para la cámara: {cam_id}")
+    
+    except Exception as e:
+        logging.error(f"Error al obtener la certeza para la cámara {cam_id}: {e}")
+    
+    return certainty
 
 async def handle_websocket_client(websocket, path):
     logger = logging.getLogger("handle_websocket_client")
@@ -55,31 +90,25 @@ async def handle_websocket_client(websocket, path):
     try:
         while True:
             try:
-                # Recepción de datos del cliente (esperamos recibir datos binarios)
+                # Recepción de datos del cliente
                 data = await websocket.recv()
 
                 if not data:
                     break
 
-                numeric_data, initial_buffer = get_numeric_data(data)
-                try:
-                    data_len = int(numeric_data.decode('ascii'))
-                except ValueError:
-                    logger.error("Invalid data length received")
-                    break
+                # Separar el ID de la cámara y la longitud de los datos
+                data = data.decode('utf-8')
+                camera_id, numeric_data = data.split(":")
+                data_len = int(numeric_data)
 
-                logger.info("data_len: {}".format(data_len))
+                logger.info(f"Camera ID: {camera_id}, Data length: {data_len}")
 
-                buffer = initial_buffer
-                bytes_left = data_len - len(buffer)
+                buffer = b""
+                bytes_left = data_len
 
-                # Recibimos los datos restantes
+                # Recibimos los datos de la imagen
                 while bytes_left > 0:
                     fragment = await websocket.recv()
-                    if not fragment:
-                        logger.error("Connection lost before receiving complete data")
-                        return
-
                     buffer += fragment
                     bytes_left = data_len - len(buffer)
 
@@ -87,36 +116,20 @@ async def handle_websocket_client(websocket, path):
                     logger.error("Received data length does not match the expected length")
                     break
 
-                # Decodificar la imagen de los bytes
+                # Procesar la imagen
                 nparr = np.frombuffer(buffer, np.uint8)
                 img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
                 if img is None:
-                    logger.error("Failed to decode image")
+                    logger.error("Failed to decode image from camera: {}".format(camera_id))
                     continue
 
                 # Procesar la imagen con el modelo YOLO
-                results = detect_objects(img)
-                annotated_frame = results[0].plot()
+                results = model.track(img, persist=True)
 
-                if img is None or annotated_frame is None:
-                    logger.error("The image or annotated frame is None.")
-                    continue
-
-                # Usar la función para procesar las predicciones
-                #predictions = process_predictions(results, model)
-
-                # Enviar predicciones al servidor
-                #await send_predictions_to_server(predictions)
-                
                 # Guardar el frame para depuración
-                cv2.imwrite('debug_frame.jpg', annotated_frame)
-                logger.info("Saved frame as debug_frame.jpg")
-
-                # Configurar y mostrar el frame procesado
-                cv2.imshow('YOLOv8 Tracking', annotated_frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
+                cv2.imwrite(f'debug_frame_{camera_id}.jpg', results[0].plot())
+                logger.info(f"Saved frame from camera {camera_id} as debug_frame_{camera_id}.jpg")
 
             except websockets.exceptions.ConnectionClosedError as e:
                 logger.error(f"Connection closed unexpectedly: {e}")
