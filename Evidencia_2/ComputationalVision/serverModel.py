@@ -4,14 +4,18 @@ import asyncio
 import cv2
 import numpy as np
 from ultralytics import YOLO
+import random
 #import json
 #from get_dron_certainty import process_predictions
 
 # Cargar el modelo YOLO
-model = YOLO('C:/Users/luisf/OneDrive/Documentos/Coding/Tec/Sistemas multiagentes con graficas computacionales/Espejin/Sistemas-Multiagentes/Evidencia_2/ComputationalVision/Model-training/runs/detect/train/weights/best.pt')
+model = YOLO('/Users/madafanes/TEC/Multiagentes/proyecto/Sistemas-Multiagentes/Evidencia_2/ComputationalVision/Model-training/runs/detect/train/weights/best.pt')
 
 # Configuración de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def get_certainty(id=1):
+    return random.random()
 
 def get_numeric_data(buffer):
     """
@@ -41,7 +45,7 @@ async def send_predictions_to_server(predictions):
         logging.error(f"Failed to send predictions to the server: {e}")
 '''
 
-def get_certainty(cam_id=10):
+def get_certainty2(cam_id=10):
     certainty = None
 
     try:

@@ -1,5 +1,5 @@
 import agentpy as ap
-import ComputationalVision.get_certainty
+#import ComputationalVision.get_certainty
 from .Ontology import Drone, Camera, Guard
 import random
 import time

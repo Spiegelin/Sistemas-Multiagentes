@@ -6,11 +6,11 @@ import websockets
 
 # Almacenar los websockets globalmente
 websocket_dron = None
-websocket_camara = None
+websocket_camera = None
 
 # Colas para recibir respuestas
 response_queue_dron = asyncio.Queue()
-response_queue_camara = asyncio.Queue()
+response_queue_camera = asyncio.Queue()
 
 # Función para asignar el websocket del dron
 async def set_websocket_dron(ws):
@@ -21,12 +21,12 @@ async def set_websocket_dron(ws):
         await response_queue_dron.put(message)
 
 # Función para asignar el websocket de la cámara
-async def set_websocket_camara(ws):
-    global websocket_camara
-    websocket_camara = ws
+async def set_websocket_camera(ws):
+    global websocket_camera
+    websocket_camera = ws
     print("WebSocket de la cámara asignado.")
     async for message in ws:
-        await response_queue_camara.put(message)
+        await response_queue_camera.put(message)
 
 # Función para solicitar la posición del dron y esperar la respuesta
 async def get_dron_position():
@@ -54,17 +54,20 @@ async def get_dron_position():
 # Función para solicitar la posición de la cámara y esperar la respuesta
 async def get_camera_position(id):
     """
-    Unity que regresa la posición actual de la camara con id en (x,y,z)
+    Unity regresa la posición actual de la cámara con el ID dado (x,y,z).
     """
-    global websocket_camara
-    if websocket_camara is not None:
-        request_message = "Dame la posicion de la camara"
-        await websocket_camara.send(request_message)
+    global websocket_camera
+    if websocket_camera is not None:
+        request_message = f"Dame la posicion de la camara {id}"
+        await websocket_camera.send(request_message)
         print(f"Solicitud enviada: {request_message}")
 
         # Esperar la respuesta
-        response = await response_queue_camara.get()
-        print(f"Respuesta de la cámara: {response}")
+        response = await response_queue_camera.get()
+        response = json.loads(response)
+        print(f"Respuesta de la cámara {id}: {response}")
+        response = response['pos']
+        response = tuple(map(int, response.strip("()").split(",")))
         return response
 
     else:
@@ -148,3 +151,4 @@ async def end_route():
     return flighting = False
     """
     print("END ROUTE!!!!")
+
