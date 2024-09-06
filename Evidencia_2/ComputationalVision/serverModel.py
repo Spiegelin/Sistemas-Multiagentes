@@ -21,7 +21,7 @@ model = YOLO(os.getenv("LOCAL_PATH"))
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def get_certainty(id=1):
-    return random.random()
+    return 0.8
 
 def get_numeric_data(buffer):
     """

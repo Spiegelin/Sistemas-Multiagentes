@@ -95,6 +95,7 @@ class DroneAgent(ap.Agent):
         if self.current_pos == self.model.start_position and not self.flighting:
             print(f"$ Dron despega en {self.current_pos}")
             self.patrolling = True
+            print("...SET PATROLLING...")
             self.flighting = await take_off()
             print("...TERMINÓ TAKE OFF...")
         elif self.current_pos == self.model.start_position and self.previous_pos == self.model.second_to_last and self.flighting and not self.is_dangerous and self.finish_route: 
@@ -143,10 +144,10 @@ class DroneAgent(ap.Agent):
         self.certainty = get_certainty()
         print("...TERMINÓ GET CERTAINTY EN INVESTIGATE...")
         #self.is_dangerous = ComputationalVision.detect_danger()
-        self.is_dangerous = True
+        #self.is_dangerous = True
         if self.certainty > 0.6:
             print(f"$ Dron en posición {self.current_pos} señala peligro al guardia por mensaje")
-            enviar_mensaje("guardia", {"take_control": {"certainty": self.certainty, "is_dangerous": self.is_dangerous}})
+            enviar_mensaje("guardia", {"take_control": {"certainty": self.certainty}})
             print("Mensajes Guardia: ", mensajes["guardia"], end="\n\n")
         else:
             print(f"$ Dron en posición {self.current_pos} no detectó peligro.")
@@ -197,21 +198,22 @@ class GuardAgent(ap.Agent):
     def setup(self):
         self.owl_entity = Guard()
 
-    async def take_control(self, certainty, danger):
-        print(f"* Guardia toma control del dron con certeza {certainty} y peligro {danger}")
+    async def take_control(self, certainty):
+        print(f"* Guardia toma control del dron con certeza {certainty}")
         # Se tomaría control del dron y se verifica si es peligroso
         certainty = get_certainty() # Obtener certeza de la visión computacional después de tomar control
         print("...TERMINÓ GET CERTAINTY EN GUARDIA...")
         #danger = ComputationalVision.detect_danger() # Detectar peligro por visión computacional
-        if certainty > 0.7 and danger:
+        if certainty > 0.3:
+            print("...LLEGA A TRIGGER ALARM...")
             await self.trigger_alarm()
         else:
             await move_forward()
             new_certainty = get_certainty() # Obtener certeza de la visión computacional después de tomar control
             #new_danger = ComputationalVision.detect_danger() # Detectar peligro por visión computacional
             new_danger = True
-            if certainty > 0.7 and danger:
-                if new_certainty > certainty and new_danger:
+            if certainty > 0.7:
+                if new_certainty > certainty:
                     await self.trigger_alarm()
                 else:
                     await self.false_alarm()
@@ -221,20 +223,22 @@ class GuardAgent(ap.Agent):
     async def trigger_alarm(self):
         # Se regresa a Unity que se active la alarma
         print("* ¡Alarma general! Peligro detectado.")
-        enviar_mensaje("dron", {"return_to_route": True})
-        print("Mensajes Dron: ", mensajes["dron"], end="\n\n")
-        await trigger_alarm()
+        self.investigating = False
+        return_to = await trigger_alarm()
         print("...TERMINÓ TRIGGER ALARM...")
+        enviar_mensaje("dron", {"return_to_route": return_to})
+        print("Mensajes Dron: ", mensajes["dron"], end="\n\n")
         #time.sleep(10)
 
 
     async def false_alarm(self):
         # Se regresa a Unity que fue falsa alarma y vuelva a la ruta
         print("* Falsa alarma. El dron vuelve a su ruta.")
-        enviar_mensaje("dron", {"return_to_route": True})
-        print("Mensajes Dron: ", mensajes["dron"], end="\n\n")
-        await false_alarm()
+        self.investigating = False
+        return_to = await false_alarm()
         print("...TERMINÓ FALSE ALARM...")
+        enviar_mensaje("dron", {"return_to_route": return_to})
+        print("Mensajes Dron: ", mensajes["dron"], end="\n\n")
         #time.sleep(5)
 
 
@@ -243,7 +247,7 @@ class GuardAgent(ap.Agent):
         for mensaje in mensajes_guardia:
             if "take_control" in mensaje:
                 control = mensaje["take_control"]
-                await self.take_control(control["certainty"], control["is_dangerous"])
+                await self.take_control(control["certainty"])
 
 
 #
@@ -278,6 +282,8 @@ class SecurityModel(ap.Model):
         print("...TERMINÓ REVISAR MENSAJES DRON...")
         await self.guard.revisar_mensajes()
         print("...TERMINÓ REVISAR MENSAJES GUARDIA...")
+        await self.drone.revisar_mensajes()
+        print("...TERMINÓ REVISAR MENSAJES DRON DESPUÉS DE GUARDIA...")
         for camera in self.cameras:
             await camera.detect_movement()
 
@@ -313,7 +319,7 @@ async def handler(websocket, path):
         print("Conexión establecida en la ruta raíz /")
         # Parámetros de la simulación
         parameters = {
-            'steps': 500,
+            'steps': 10,
         }
 
         # Ejecutar la simulación
@@ -328,7 +334,7 @@ async def handler(websocket, path):
             while True:
                 #message = await websocket.recv()
                 #print(f"Mensaje recibido en /: {message}")
-                
+
                 response = {"status": "connected to /"}
                 await websocket.send(json.dumps(response))
 

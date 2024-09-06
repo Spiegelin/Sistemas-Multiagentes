@@ -76,10 +76,29 @@ async def get_camera_position(id):
     
 async def take_off():
     """
-    Se indica a Unity que el dron debe empezar a volar, se regresa una confirmación de que ya está volando
-    return flighting = True
+    Se indica a Unity que el dron debe empezar a volar.
+    Unity regresa una confirmación si el dron está volando ("flying": "true" or "false").
+    return flighting = True o False
     """
-    print("Dron Take Off!!!!")
+    global websocket_dron
+    if websocket_dron is not None:
+        request_message = "Despega"
+        await websocket_dron.send(request_message)
+        print(f"Solicitud enviada: {request_message}")
+
+        # Esperar la respuesta
+        response = await response_queue_dron.get()
+        response = json.loads(response)
+        print(f"Respuesta de vuelo del dron: {response}")
+
+        # Retornar el estado de vuelo
+        flighting = response['flying'] == "true"
+        return flighting
+
+    else:
+        print("El WebSocket del dron no está conectado.")
+        return False
+
 
 
 async def next_position():
@@ -94,12 +113,24 @@ async def next_position():
 
 async def move_to(position):
     """
-    Unity recibe la posición a la que el dron se debe de mover
-    Regresa:
-    "move" : True
-    Si no se espera el programa
+    Envía una solicitud a Unity para mover el dron a la posición especificada.
+    position: tupla con las coordenadas (x, y, z)
     """
-    print("MOVE TO", position)
+    global websocket_dron
+    if websocket_dron is not None:
+        request_message = json.dumps({"pos": str(position)})
+        await websocket_dron.send(request_message)
+        print(f"Solicitud enviada: {request_message}")
+
+        # Esperar la respuesta de confirmación si es necesario
+        response = await response_queue_dron.get()  # Si esperas confirmación
+        response = json.loads(response)
+        print(f"Respuesta de movimiento del dron: {response}")
+
+    else:
+        print("El WebSocket del dron no está conectado.")
+
+
 
 async def move_forward():
     """
@@ -107,7 +138,24 @@ async def move_forward():
     Unity mueve el dron un poco adelante en x o z
     Unity regresa que ya se terminó de mover el dron
     """
-    print("MOVE FORWARD!!!!")
+    global websocket_dron
+    if websocket_dron is not None:
+        request_message = "Avanza"
+        await websocket_dron.send(request_message)
+        print(f"Solicitud enviada: {request_message}")
+
+        # Esperar la respuesta
+        response = await response_queue_dron.get()
+        response = json.loads(response)
+        print(f"Respuesta de avanzar dron: {response}")
+
+        # Retornar el estado de vuelo
+        mvFoward = response['Forward'] == "true"
+        return mvFoward
+
+    else:
+        print("El WebSocket del dron no está conectado.")
+        return False
 
 
 async def trigger_alarm():
@@ -115,7 +163,25 @@ async def trigger_alarm():
     Unity recibe que trigger_alarm : True
     Unity regresa que ya se triggereo la alarma
     """
-    print("TRIGGER ALARM!!!!")
+    global websocket_dron
+    if websocket_dron is not None:
+        request_message = "Prende la alarma"
+        await websocket_dron.send(request_message)
+        print(f"Solicitud enviada: {request_message}")
+
+        # Esperar la respuesta
+        response = await response_queue_dron.get()
+        response = json.loads(response)
+        print(f"Respuesta de la alarma: {response}")
+
+        # Retornar el estado de vuelo
+        alarm = response['alarm'] == "true"
+        return alarm
+
+    else:
+        print("El WebSocket del dron no está conectado.")
+        return False
+
 
 
 async def false_alarm():
@@ -123,7 +189,24 @@ async def false_alarm():
     Unity recibe que false_alarm : True
     Unity regresa que ya sucedió el evento de falsa alarma
     """
-    print("FALSE ALARM!!!!")
+    global websocket_dron
+    if websocket_dron is not None:
+        request_message = "Falsa alarma"
+        await websocket_dron.send(request_message)
+        print(f"Solicitud enviada: {request_message}")
+
+        # Esperar la respuesta
+        response = await response_queue_dron.get()
+        response = json.loads(response)
+        print(f"Respuesta de vuelo del dron: {response}")
+
+        # Retornar el estado de vuelo
+        falseAlarm = response['falseAlarm'] == "true"
+        return falseAlarm
+
+    else:
+        print("El WebSocket del dron no está conectado.")
+        return False
 
 
 async def get_start_position():
@@ -131,9 +214,23 @@ async def get_start_position():
     Unity recibe get_start_position : True
     Unity regresa la posición inicial de la ruta
     """
-    position = (0, 0, 0)
-    print("START POSITION:", position)
-    return position
+    global websocket_dron
+    if websocket_dron is not None:
+        request_message = "Primer punto de ruta"
+        await websocket_dron.send(request_message)
+        print(f"Solicitud enviada: {request_message}")
+
+        # Esperar la respuesta
+        response = await response_queue_dron.get()
+        response = json.loads(response)
+        print(f"Respuesta del dron: {response}")
+        response = response['pos']
+        response = tuple(map(int, response.strip("()").split(",")))
+        return response
+
+    else:
+        print("El WebSocket del dron no está conectado.")
+        return None
 
 async def get_second_to_last_position():
     """
@@ -141,8 +238,23 @@ async def get_second_to_last_position():
     Unity regresa la penúltima posición de la ruta
     1 antes de que termine la ruta o que inicia la ruta en ese caso
     """
-    position = (-1, -1, -1)
-    return position
+    global websocket_dron
+    if websocket_dron is not None:
+        request_message = "Penultimo punto de ruta"
+        await websocket_dron.send(request_message)
+        print(f"Solicitud enviada: {request_message}")
+
+        # Esperar la respuesta
+        response = await response_queue_dron.get()
+        response = json.loads(response)
+        print(f"Respuesta del dron: {response}")
+        response = response['pos']
+        response = tuple(map(int, response.strip("()").split(",")))
+        return response
+
+    else:
+        print("El WebSocket del dron no está conectado.")
+        return None
 
 async def end_route():
     """
@@ -150,5 +262,21 @@ async def end_route():
     Unity regresa 
     return flighting = False
     """
-    print("END ROUTE!!!!")
+    global websocket_dron
+    if websocket_dron is not None:
+        request_message = "Termina la ruta"
+        await websocket_dron.send(request_message)
+        print(f"Solicitud enviada: {request_message}")
 
+        # Esperar la respuesta
+        response = await response_queue_dron.get()
+        response = json.loads(response)
+        print(f"Respuesta de vuelo del dron: {response}")
+
+        # Retornar el estado de vuelo
+        endRoute = response['endRoute'] == "true"
+        return endRoute
+
+    else:
+        print("El WebSocket del dron no está conectado.")
+        return False
