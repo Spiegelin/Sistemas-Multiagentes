@@ -97,9 +97,8 @@ class DroneAgent(ap.Agent):
         if self.current_pos == self.model.start_position and not self.flighting:
             print(f"$ Dron despega en {self.current_pos}")
             self.patrolling = True
-            self.flighting = True
-            await take_off()
-        elif self.current_pos == self.model.start_position and self.previous_pos == self.model.route[-2] and self.flighting and not self.is_dangerous and self.finish_route: 
+            self.flighting = await take_off()
+        elif self.current_pos == self.model.start_position and self.previous_pos == self.model.second_to_last and self.flighting and not self.is_dangerous and self.finish_route: 
             await self.end_route()
         await self.move_along_route()
 
@@ -118,9 +117,8 @@ class DroneAgent(ap.Agent):
         print(f"$ Dron terminó su ruta")
         print(f"$ Dron desciende en {self.current_pos}")
         print(f"$ Dron se espera por 10 segundos")
-        self.flighting = False
+        self.flighting = await end_route()
         self.finish_route = False   
-        await end_route()
         #time.sleep(10)
 
     async def receive_alert(self, certainty, position):
@@ -252,6 +250,7 @@ class SecurityModel(ap.Model):
 
         # Ruta predefinida para el dron, la manda unity
         self.start_position = await get_start_position() # (x,y,z)
+        self.second_to_last = await get_second_to_last_position()
         self.steps = 0
 
         await self.drone.initialize()
