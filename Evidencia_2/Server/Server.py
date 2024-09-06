@@ -90,7 +90,7 @@ class DroneAgent(ap.Agent):
     async def initialize(self):
         self.current_pos = await get_dron_position()
         print(f"CURRENT POS: {self.current_pos}")
-        self.certainty = get_dron_certainty()  # 0 .. 1
+        self.certainty = get_certainty()  # 0 .. 1
         print(f"CERTAINTY: ", self.certainty)
 
     async def start_patrol(self):
@@ -139,7 +139,7 @@ class DroneAgent(ap.Agent):
             await self.move_to(self.target_pos)
 
         # Ya que llegó a la posición objetivo, se verifica si es peligroso
-        self.certainty = get_dron_certainty()
+        self.certainty = get_certainty()
         #self.is_dangerous = ComputationalVision.detect_danger()
         self.is_dangerous = True
         if self.certainty > 0.6:
@@ -194,13 +194,13 @@ class GuardAgent(ap.Agent):
     async def take_control(self, certainty, danger):
         print(f"* Guardia toma control del dron con certeza {certainty} y peligro {danger}")
         # Se tomaría control del dron y se verifica si es peligroso
-        certainty = get_dron_certainty() # Obtener certeza de la visión computacional después de tomar control
+        certainty = get_certainty() # Obtener certeza de la visión computacional después de tomar control
         #danger = ComputationalVision.detect_danger() # Detectar peligro por visión computacional
         if certainty > 0.7 and danger:
             await self.trigger_alarm()
         else:
             await move_forward()
-            new_certainty = get_dron_certainty() # Obtener certeza de la visión computacional después de tomar control
+            new_certainty = get_certainty() # Obtener certeza de la visión computacional después de tomar control
             #new_danger = ComputationalVision.detect_danger() # Detectar peligro por visión computacional
             new_danger = True
             if certainty > 0.7 and danger:
