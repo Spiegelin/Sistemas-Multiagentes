@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+import os
 import logging
 import websockets
 import asyncio
@@ -5,11 +7,15 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 import random
+
+# Load the environment variables
+load_dotenv()
+
 #import json
 #from get_dron_certainty import process_predictions
 
 # Cargar el modelo YOLO
-model = YOLO('/Users/madafanes/TEC/Multiagentes/proyecto/Sistemas-Multiagentes/Evidencia_2/ComputationalVision/Model-training/runs/detect/train/weights/best.pt')
+model = YOLO(os.getenv("LOCAL_PATH"))
 
 # Configuración de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

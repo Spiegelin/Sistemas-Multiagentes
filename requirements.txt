@@ -1,0 +1,8 @@
+websockets
+agentpy
+owlready2
+opencv2
+ultralytics
+numpy
+torch
+python-dotenv
