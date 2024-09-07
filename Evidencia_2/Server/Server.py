@@ -6,7 +6,7 @@ import json
 import agentpy as ap
 import time
 from UnityFunctions.UnityFunctions import *
-from ComputationalVision.serverModel import get_certainty2, get_certainty
+from ComputationalVision.serverModel import get_certainty
 from owlready2 import *
 
 #
@@ -97,7 +97,7 @@ class DroneAgent(ap.Agent):
             self.patrolling = True
             print("...SET PATROLLING...")
             self.flighting = await take_off()
-            print("...TERMINÓ TAKE OFF...")
+            print("...TERMINÓ TAKE OFF...", self.flighting)
         elif self.current_pos == self.model.start_position and self.previous_pos == self.model.second_to_last and self.flighting and not self.is_dangerous and self.finish_route: 
             await self.end_route()
         await self.move_along_route()
@@ -129,7 +129,7 @@ class DroneAgent(ap.Agent):
             self.target_pos = position
 
             # Si la certeza es mayor a 0.5 y no está investigando ya, se inicia una investigación
-            if self.certainty > 0.5:
+            if self.certainty != None and self.certainty > 0.5:
                 self.before_alert_pos = self.current_pos
                 self.investigating = True
                 print(f"$ Posición del dron antes de investigar: {self.before_alert_pos}")
@@ -146,6 +146,7 @@ class DroneAgent(ap.Agent):
         #self.is_dangerous = ComputationalVision.detect_danger()
         #self.is_dangerous = True
         if self.certainty > 0.6:
+            self.investigate = False
             print(f"$ Dron en posición {self.current_pos} señala peligro al guardia por mensaje")
             enviar_mensaje("guardia", {"take_control": {"certainty": self.certainty}})
             print("Mensajes Guardia: ", mensajes["guardia"], end="\n\n")
@@ -182,15 +183,16 @@ class CameraAgent(ap.Agent):
         self.owl_entity = Camera()
         self.id = str(self)[17:-1]
         
-    async def detect_movement(self):
+    def detect_movement(self):
         # Simular detección de maldad? y llamar al dron si es necesario
-        position = await get_camera_position(self.id)
-        print("...TERMINÓ GET CAMERA POSITION...")
+        position = get_camera_position(self.id)
+        print("...TERMINÓ GET CAMERA POSITION...", self.id)
         certainty = get_certainty(self.id)
-        print("...TERMINÓ GET CERTATINTY EN CAMERA...")
+        print("...TERMINÓ GET CERTAINTY EN CAMERA...", certainty)
         #danger = ComputationalVision.detect_danger()
-        if certainty > 0.5:
+        if certainty != None and certainty > 0.5:
             enviar_mensaje("dron", {"receive_alert": {"certainty": certainty, "position": position}})
+            #await self.model.drone.receive_alert(certainty, position)
             print(f"- {self}: Aviso al dron sobre una posible amenaza en {position} con certeza {certainty}.")
             print("Mensajes Dron: ", mensajes["dron"], end="\n\n")
 
@@ -261,7 +263,7 @@ class SecurityModel(ap.Model):
         print("...TERMINÓ SETUP DRON IN MODEL...")
         await self.drone.initialize()
         print("...TERMINÓ initialize DRON IN MODEL...")
-        self.cameras = ap.AgentList(self, 3, CameraAgent)
+        self.cameras = ap.AgentList(self, 2, CameraAgent)
         print("...TERMINÓ SETUP CAMERAS IN MODEL...")
         self.guard = GuardAgent(self)
         print("...TERMINÓ SETUP GUARDIA IN MODEL...")
@@ -285,7 +287,7 @@ class SecurityModel(ap.Model):
         await self.drone.revisar_mensajes()
         print("...TERMINÓ REVISAR MENSAJES DRON DESPUÉS DE GUARDIA...")
         for camera in self.cameras:
-            await camera.detect_movement()
+            camera.detect_movement()
 
         print("...TERMINÓ DETECTAR MOVEMENT...")
 
@@ -293,10 +295,13 @@ class SecurityModel(ap.Model):
 
 
 
-
+#camera_connected = False
+#dron_connected = False
 async def handler(websocket, path):
+    #global camera_connected, dron_connected
     if path == "/camera":
         print("Conexión establecida en la ruta /camera")
+        #camera_connected = True
         try:
             await set_websocket_camera(websocket)
 
@@ -306,6 +311,7 @@ async def handler(websocket, path):
             print(f"Error en /camera: {e}")
 
     elif path == "/dron":
+        #dron_connected = True
         print("Conexión establecida en la ruta /dron")
         try:
             await set_websocket_dron(websocket)
@@ -317,9 +323,16 @@ async def handler(websocket, path):
     
     else:
         print("Conexión establecida en la ruta raíz /")
+        # Verificar si ambas conexiones están activas antes de iniciar
+        #while not (camera_connected and dron_connected):
+        #    print("Esperando conexiones con /camera y /dron...")
+        #    await asyncio.sleep(1)
+
+        #print("Conexiones activas con /camera y /dron, comenzando simulación...")
+        
         # Parámetros de la simulación
         parameters = {
-            'steps': 10,
+            'steps': 1000,
         }
 
         # Ejecutar la simulación
@@ -360,8 +373,8 @@ async def handler(websocket, path):
 
         except websockets.ConnectionClosed:
             print("Conexión cerrada en /")
-        except Exception as e:
-            print(f"Error en la ruta raíz: {e}")
+        #except Exception as e:
+         #   print(f"Error en la ruta raíz: {e}")
 
 async def main():
     start_server = websockets.serve(handler, 'localhost', 8765)

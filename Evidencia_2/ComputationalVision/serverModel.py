@@ -20,7 +20,7 @@ model = YOLO(os.getenv("LOCAL_PATH"))
 # Configuración de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def get_certainty(id=1):
+def get_certainty2(id=1):
     return 0.8
 
 def get_numeric_data(buffer):
@@ -51,8 +51,8 @@ async def send_predictions_to_server(predictions):
         logging.error(f"Failed to send predictions to the server: {e}")
 '''
 
-def get_certainty2(cam_id=10):
-    certainty = None
+def get_certainty(cam_id="10"):
+    certainty = 0
 
     try:
         # Cargar la imagen de depuración de la cámara
@@ -85,13 +85,14 @@ def get_certainty2(cam_id=10):
 
                 if certainty is None:
                     logging.warning(f"No se encontraron detecciones de 'bad' para la cámara: {cam_id}")
+                    
             else:
                 logging.warning(f"No hay cajas de detección para la cámara: {cam_id}")
     
     except Exception as e:
         logging.error(f"Error al obtener la certeza para la cámara {cam_id}: {e}")
     
-    return certainty
+    return float(certainty)
 
 async def handle_websocket_client(websocket, path):
     logger = logging.getLogger("handle_websocket_client")
@@ -163,6 +164,9 @@ async def websocket_server():
 
     async with websockets.serve(handle_websocket_client, HOST, PORT):
         await asyncio.Future()  # Run forever
+
+def getcertainty(id=1):
+    return 0.82
 
 if __name__ == "__main__":
     try:
